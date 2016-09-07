@@ -34,9 +34,7 @@ public:
       std::exit(error);
     }
 
-    tb_clear();
-    update_query();
-    init();
+    apply_filter();
   }
 
   ~CocoClient()
@@ -69,8 +67,7 @@ public:
     else if (ev.key == TB_KEY_BACKSPACE) {
       if (!query.empty()) {
         query.pop_back();
-        update_query();
-        init();
+        apply_filter();
       }
     }
     else if (ev.key == TB_KEY_ARROW_UP) {
@@ -115,15 +112,23 @@ public:
     else {
       if ((ev.ch != 0) || (ev.key == 32 && ev.ch == 0)) {
         query.push_back(ev.ch);
-        update_query();
-        init();
+        apply_filter();
       }
     }
     return false;
   }
 
 private:
-  std::vector<std::string> filter()
+  void apply_filter()
+  {
+    filtered = filter();
+    render_items = filtered;
+    selected = 0;
+    cursor = 0;
+    offset = 0;
+  }
+
+  std::vector<std::string> filter() const
   {
     std::regex re(query);
 
@@ -133,7 +138,7 @@ private:
     else {
       std::vector<std::string> ret;
       for (auto&& elem : inputs) {
-        if (std::regex_match(elem, re)) {
+        if (std::regex_search(elem, re)) {
           ret.push_back(elem);
         }
       }
@@ -141,14 +146,26 @@ private:
     }
   }
 
-  void update_query()
+  void update_items() const
+  {
+    tb_clear();
+
+    print_query();
+    for (int y = 0; y < (int)render_items.size(); ++y) {
+      print_line(render_items[y], y, y == selected);
+    }
+
+    tb_present();
+  }
+
+  void print_query() const
   {
     std::string const query_header = "QUERY> ";
-    std::string print_query = query_header + query;
+    std::string query_str = query_header + query;
 
     for (int x = 0; x < tb_width(); ++x) {
-      auto const c = static_cast<uint32_t>(x < print_query.length() ? print_query[x] : ' ');
-      if (x == print_query.length()) {
+      auto const c = static_cast<uint32_t>(x < query_str.length() ? query_str[x] : ' ');
+      if (x == query_str.length()) {
         tb_change_cell(x, 0, c, TB_WHITE, TB_WHITE);
       }
       else {
@@ -157,40 +174,19 @@ private:
     }
   }
 
-  void init()
+  void print_line(std::string line, unsigned y, bool selected) const
   {
-    filtered = filter();
-    render_items = filtered;
-    selected = 0;
-    cursor = 0;
-    offset = 0;
-  }
-
-  void print(unsigned x, unsigned y, std::string line, bool selected)
-  {
-    auto const c = static_cast<uint32_t>(x < line.length() ? line[x] : ' ');
     constexpr unsigned y_offset = 1;
 
-    if (selected) {
-      tb_change_cell(x, y + y_offset, c, TB_RED, TB_WHITE);
-    }
-    else {
-      tb_change_cell(x, y + y_offset, c, TB_WHITE, TB_BLACK);
-    }
-  }
-
-  void update_items()
-  {
-    tb_clear();
-    update_query();
-
-    for (int y = 0; y < (int)render_items.size(); ++y) {
-      for (int x = 0; x < tb_width(); ++x) {
-        print(x, y, render_items[y], y == selected);
+    for (int x = 0; x < tb_width(); ++x) {
+      auto const c = static_cast<uint32_t>(x < line.length() ? line[x] : ' ');
+      if (selected) {
+        tb_change_cell(x, y + y_offset, c, TB_RED, TB_WHITE);
+      }
+      else {
+        tb_change_cell(x, y + y_offset, c, TB_WHITE, TB_BLACK);
       }
     }
-
-    tb_present();
   }
 };
 

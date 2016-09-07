@@ -11,21 +11,45 @@ class CocoClient {
   std::vector<std::string> inputs;
   std::vector<std::string> render_items;
   std::vector<std::string> filtered;
+
   std::string query;
+
   long selected;
   long cursor;
+
   size_t offset;
   size_t query_offset;
 
   bool flag_selected = false;
 
 public:
-  CocoClient(std::vector<std::string> inputs) : inputs{std::move(inputs)}
+  CocoClient()
   {
-    tb_clear();
+    for (std::string line; std::getline(std::cin, line);) {
+      inputs.push_back(line);
+    }
 
+    if (int error = tb_init()) {
+      std::cerr << "tb_init() failed with error code " << error << std::endl;
+      std::exit(error);
+    }
+
+    tb_clear();
     update_query();
     init();
+  }
+
+  ~CocoClient()
+  {
+    try {
+      tb_shutdown();
+
+      if (flag_selected) {
+        std::cout << render_items[offset + selected] << std::endl;
+      }
+    }
+    catch (...) {
+    }
   }
 
   bool poll_event()
@@ -96,13 +120,6 @@ public:
       }
     }
     return false;
-  }
-
-  void describe() const
-  {
-    if (flag_selected) {
-      std::cout << render_items[offset + selected] << std::endl;
-    }
   }
 
 private:
@@ -179,23 +196,8 @@ private:
 
 int main()
 {
-  std::vector<std::string> inputs;
-  for (std::string line; std::getline(std::cin, line);) {
-    inputs.push_back(line);
-  }
-
-  if (int error = tb_init()) {
-    std::cerr << "tb_init() failed with error code " << error << std::endl;
-    return error;
-  }
-
-  auto cli = CocoClient(inputs);
-
-  while (!cli.poll_event()) {
-  }
-
-  tb_shutdown();
-
-  cli.describe();
+  CocoClient cli{};
+  while (!cli.poll_event())
+    ;
   return 0;
 }

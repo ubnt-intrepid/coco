@@ -1,0 +1,14 @@
+---
+BasedOnStyle: LLVM
+UseTab: Never
+IndentWidth: 2
+BreakBeforeBraces: Stroustrup
+AllowShortIfStatementsOnASingleLine: false
+IndentCaseLabels: false
+ColumnLimit: 120
+SortIncludes: false
+
+---
+Language: Cpp
+Standard: Cpp11
+PointerAlignment: Left

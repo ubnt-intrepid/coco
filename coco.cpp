@@ -64,7 +64,7 @@ public:
     else if (ev.key == TB_KEY_ESC) {
       return true;
     }
-    else if (ev.key == TB_KEY_BACKSPACE) {
+    else if (ev.key == TB_KEY_BACKSPACE || ev.key == TB_KEY_BACKSPACE2) {
       if (!query.empty()) {
         query.pop_back();
         apply_filter();

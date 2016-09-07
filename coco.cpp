@@ -1,115 +1,185 @@
-#include <iostream>
 #include <termbox.h>
-#include <cassert>
 #include <cstdint>
+
+#include <algorithm>
+#include <iostream>
 #include <string>
-#include <array>
+#include <vector>
+#include <regex>
 
-static const std::string chars{"nnnnnnnnnbbbbbbbbbuuuuuuuuuBBBBBBBBB"};
-
-static constexpr std::array<std::uint16_t, 4> all_attrs = {
-    0, TB_BOLD, TB_UNDERLINE, TB_BOLD | TB_UNDERLINE,
+struct Env {
+  std::vector<std::string> inputs;
+  std::vector<std::string> render_items;
+  std::vector<std::string> filtered;
+  std::string query;
+  long selected;
+  long cursor;
+  size_t offset;
+  size_t query_offset;
 };
 
-static int next_char(int current)
-{
-  current++;
-  if (!chars[current])
-    current = 0;
-  return current;
-}
+static Env env;
 
-static void draw_line(int x, int y, std::uint16_t bg)
+std::vector<std::string> filter()
 {
-  int current_char = 0;
-  for (int a = 0; a < 4; ++a) {
-    for (int c = TB_DEFAULT; c <= TB_WHITE; c++) {
-      std::uint16_t fg = all_attrs[a] | c;
-      tb_change_cell(x, y, chars[current_char], fg, bg);
-      current_char = next_char(current_char);
-      x++;
+  std::regex re(env.query);
+
+  if (env.query.empty()) {
+    return env.inputs;
+  }
+  else {
+    std::vector<std::string> ret;
+    for (auto&& elem : env.inputs) {
+      if (std::regex_match(elem, re)) {
+        ret.push_back(elem);
+      }
     }
+    return ret;
   }
 }
 
-template <std::size_t N> static void print_combinations_table(int sx, int sy, std::array<std::uint16_t, N> const& attrs)
+void update_query(bool init = false)
 {
-  for (int i = 0; i < attrs.size(); ++i) {
-    for (int c = TB_DEFAULT; c <= TB_WHITE; ++c) {
-      std::uint16_t bg = attrs[i] | c;
-      draw_line(sx, sy, bg);
-      ++sy;
+  std::string const query_header = "QUERY> ";
+
+  std::string print_query = query_header + env.query;
+
+  int const width = tb_width();
+
+  for (int x = 0; x < width; ++x) {
+    auto const c = static_cast<uint32_t>(x < print_query.length() ? print_query[x] : ' ');
+
+    if (x == print_query.length()) {
+      tb_change_cell(x, 0, c, TB_WHITE, TB_WHITE);
     }
+    else {
+      tb_change_cell(x, 0, c, TB_WHITE, TB_BLACK);
+    }
+  }
+
+  if (init) {
+    env.filtered = filter();
+    env.render_items = env.filtered;
+    env.selected = 0;
+    env.cursor = 0;
+    env.offset = 0;
   }
 }
 
-static void draw_all()
+void print(unsigned x, unsigned y, std::string line, bool selected)
+{
+  auto const c = static_cast<uint32_t>(x < line.length() ? line[x] : ' ');
+  constexpr unsigned y_offset = 1;
+
+  if (selected) {
+    tb_change_cell(x, y + y_offset, c, TB_RED, TB_WHITE);
+  }
+  else {
+    tb_change_cell(x, y + y_offset, c, TB_WHITE, TB_BLACK);
+  }
+}
+
+void update_items()
 {
   tb_clear();
+  update_query();
 
-  tb_select_output_mode(TB_OUTPUT_NORMAL);
-
-  static std::array<std::uint16_t, 2> col1 = {0, TB_BOLD};
-  static std::array<std::uint16_t, 1> col2 = {TB_REVERSE};
-
-  print_combinations_table(1, 1, col1);
-  print_combinations_table(2 + chars.length(), 1, col2);
-  tb_present();
-
-  tb_select_output_mode(TB_OUTPUT_GRAYSCALE);
-  int x, y;
-  for (x = 0, y = 23; x < 24; ++x) {
-    tb_change_cell(x, y, '@', x, 0);
-    tb_change_cell(x + 25, y, ' ', 0, x);
-  }
-  tb_present();
-
-  tb_select_output_mode(TB_OUTPUT_216);
-  y++;
-  for (int c = 0, x = 0; c < 216; ++c, ++x) {
-    if (!(x % 24)) {
-      x = 0;
-      ++y;
+  for (int y = 0; y < (int)env.render_items.size(); ++y) {
+    for (int x = 0; x < tb_width(); ++x) {
+      print(x, y, env.render_items[y], y == env.selected);
     }
-    tb_change_cell(x, y, '@', c, 0);
-    tb_change_cell(x + 25, y, ' ', 0, c);
   }
-  tb_present();
 
-  tb_select_output_mode(TB_OUTPUT_256);
-  y++;
-  for (int c = 0, x = 0; c < 256; ++c, ++x) {
-    if (!(x % 24)) {
-      x = 0;
-      ++y;
-    }
-    tb_change_cell(x, y, '+', c | ((y & 1) ? TB_UNDERLINE : 0), 0);
-    tb_change_cell(x + 25, y, ' ', 0, c);
-  }
   tb_present();
 }
 
-int main(int argc, char* argv[])
+int main()
 {
-  static_cast<void>(argc);
-  static_cast<void>(argv);
+  for (std::string line; std::getline(std::cin, line);) {
+    env.inputs.push_back(line);
+  }
 
   if (int error = tb_init()) {
     std::cerr << "tb_init() failed with error code " << error << std::endl;
     return error;
   }
+  tb_clear();
 
-  draw_all();
+  update_query(true);
 
-  for (tb_event ev; tb_poll_event(&ev);) {
-    if (ev.type == TB_EVENT_KEY && ev.key == TB_KEY_ESC) {
-      break;
+  bool selected = false;
+  for (bool quit = false; !quit;) {
+
+    update_items();
+
+    tb_event ev;
+    tb_poll_event(&ev);
+
+    if (ev.key == TB_KEY_ENTER) {
+      selected = true;
+      quit = true;
     }
-    else if (ev.type == TB_EVENT_RESIZE) {
-      draw_all();
+    else if (ev.key == TB_KEY_ESC) {
+      quit = true;
+    }
+    else if (ev.key == TB_KEY_BACKSPACE) {
+      if (!env.query.empty()) {
+        env.query.pop_back();
+        update_query(true);
+      }
+    }
+    else if (ev.key == TB_KEY_ARROW_UP) {
+      if (env.selected > -1) {
+        env.selected -= 1;
+      }
+      if (env.cursor > 0) {
+        env.cursor -= 1;
+      }
+
+      if (env.selected == -1) {
+        env.selected += 1;
+        if (env.offset > 0) {
+          env.offset -= 1;
+
+          env.render_items.resize(env.filtered.size() - env.offset);
+          std::copy(env.filtered.begin() + env.offset, env.filtered.end(), env.render_items.begin());
+        }
+      }
+    }
+    else if (ev.key == TB_KEY_ARROW_DOWN) {
+      if (env.cursor < env.render_items.size() - 1) {
+        env.cursor += 1;
+      }
+      if ((env.render_items.size() < tb_height() - 1) && (env.selected < env.render_items.size() - 1)) {
+        env.selected += 1;
+      }
+      else if ((env.render_items.size() > tb_height() - 1) && (env.selected < tb_height() - 1)) {
+        env.selected += 1;
+      }
+
+      if (env.selected == tb_height() - 1) {
+        env.selected -= 1;
+        if (env.offset < env.filtered.size() - 1) {
+          env.offset += 1;
+
+          env.render_items.resize(env.filtered.size() - env.offset);
+          std::copy(env.filtered.begin() + env.offset, env.filtered.end(), env.render_items.begin());
+        }
+      }
+    }
+    else {
+      if ((ev.ch != 0) || (ev.key == 32 && ev.ch == 0)) {
+        env.query.push_back(ev.ch);
+        update_query(true);
+      }
     }
   }
 
   tb_shutdown();
+
+  if (selected) {
+    std::cout << env.render_items[env.offset + env.selected] << std::endl;
+  }
+
   return 0;
 }

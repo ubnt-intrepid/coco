@@ -27,8 +27,8 @@ def configure(conf):
         cflags = ['/EHsc']
         cxxflags = ['/EHsc']
     else:
-        cxxflags = ['-O2', '-Wall', '-std=c++11']
-        cflags = ['-O2', '-Wall', '-std=c11']
+        cxxflags = ['-O2', '-Wall', '-Wextra', '-std=c++11']
+        cflags = ['-O2', '-Wall', '-Wextra', '-std=c11']
 
     conf.env.append_unique('CFLAGS', cflags)
     conf.env.append_unique('CXXFLAGS', cxxflags)

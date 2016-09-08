@@ -8,20 +8,36 @@
 #include <vector>
 #include <regex>
 
+class TermBox {
+public:
+  TermBox() = default;
+  ~TermBox() noexcept
+  {
+    try {
+      tb_shutdown();
+    }
+    catch (...) {
+    }
+  }
+  void init()
+  {
+    int error = tb_init();
+    if (error) {
+      std::cerr << "tb_init() failed with error code " << error << std::endl;
+      std::exit(error);
+    }
+  }
+};
+
 class CocoClient {
-  std::vector<std::string> inputs;
-  std::vector<std::string> render_items;
-  std::vector<std::string> filtered;
-
-  std::string query;
-
-  long selected;
-  long cursor;
-
+  TermBox termbox;
+  std::vector<std::string> inputs, render_items, filtered;
+  std::string query, selected_str;
+  long cursor, selected;
   size_t offset;
-  size_t query_offset;
 
-  bool flag_selected = false;
+  std::string const query_header = "QUERY> ";
+  static constexpr unsigned y_offset = 1;
 
 public:
   CocoClient()
@@ -29,37 +45,28 @@ public:
     for (std::string line; std::getline(std::cin, line);) {
       inputs.push_back(line);
     }
-
-    if (int error = tb_init()) {
-      std::cerr << "tb_init() failed with error code " << error << std::endl;
-      std::exit(error);
-    }
-
+    termbox.init();
     apply_filter();
   }
 
-  ~CocoClient()
+  std::string select_line()
   {
-    try {
-      tb_shutdown();
+    while (true) {
+      update_items();
+      if (handle_event())
+        break;
+    }
 
-      if (flag_selected) {
-        std::cout << render_items[offset + selected] << std::endl;
-      }
-    }
-    catch (...) {
-    }
+    return selected_str;
   }
 
-  bool poll_event()
+  bool handle_event()
   {
-    update_items();
-
     tb_event ev;
     tb_poll_event(&ev);
 
     if (ev.key == TB_KEY_ENTER) {
-      flag_selected = true;
+      selected_str = render_items[offset + selected];
       return true;
     }
     else if (ev.key == TB_KEY_ESC) {
@@ -110,11 +117,9 @@ public:
         }
       }
     }
-    else {
-      if ((ev.ch != 0) || (ev.key == 32 && ev.ch == 0)) {
-        query.push_back(ev.ch);
-        apply_filter();
-      }
+    else if ((ev.ch != 0) || (ev.key == 32 && ev.ch == 0)) {
+      query.push_back(ev.ch);
+      apply_filter();
     }
     return false;
   }
@@ -161,7 +166,6 @@ private:
 
   void print_query() const
   {
-    std::string const query_header = "QUERY> ";
     std::string query_str = query_header + query;
 
     for (int x = 0; x < tb_width(); ++x) {
@@ -177,8 +181,6 @@ private:
 
   void print_line(std::string line, unsigned y, bool selected) const
   {
-    constexpr unsigned y_offset = 1;
-
     for (int x = 0; x < tb_width(); ++x) {
       auto const c = static_cast<uint32_t>(x < line.length() ? line[x] : ' ');
       if (selected) {
@@ -193,8 +195,14 @@ private:
 
 int main()
 {
-  CocoClient cli{};
-  while (!cli.poll_event())
-    ;
+  std::string selected;
+  {
+    CocoClient cli{};
+    selected = cli.select_line();
+  }
+
+  if (!selected.empty()) {
+    std::cout << selected << std::endl;
+  }
   return 0;
 }

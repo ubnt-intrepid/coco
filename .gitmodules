@@ -1,0 +1,3 @@
+[submodule "external/nanojson"]
+	path = external/nanojson
+	url = https://github.com/ys-nuem/nanojson.git

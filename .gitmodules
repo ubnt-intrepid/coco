@@ -1,3 +1,6 @@
 [submodule "external/nanojson"]
 	path = external/nanojson
 	url = https://github.com/ys-nuem/nanojson.git
+[submodule "external/termbox"]
+	path = external/termbox
+	url = https://github.com/nsf/termbox.git

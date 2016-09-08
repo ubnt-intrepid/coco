@@ -18,10 +18,10 @@ def init(ctx):
     pass
 
 def options(opt):
-    opt.load('compiler_cxx')
+    opt.load('compiler_c compiler_cxx')
 
 def configure(conf):
-    conf.load('compiler_cxx gnu_dirs')
+    conf.load('compiler_c compiler_cxx gnu_dirs')
 
     target = conf.options.check_cxx_compiler
     if target is None:
@@ -37,9 +37,12 @@ def configure(conf):
         'external/nanojson/include/',
         'external/nanojson/external/picojson/',
         'external/nanojson/external/boost/preprocessor/include/',
+        'external/termbox/src/',
     ])
 
 def build(bld):
+    bld.recurse('external/termbox/src')
     bld.program(features='cxx cxxprogram',
                 target='coco',
-                source='coco.cpp')
+                source='coco.cpp',
+                use = 'termbox_static')

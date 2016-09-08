@@ -1,5 +1,6 @@
 #include <termbox.h>
 #include <cstdint>
+#include <nanojson.hpp>
 
 #include <algorithm>
 #include <iostream>

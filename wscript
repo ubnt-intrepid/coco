@@ -34,15 +34,18 @@ def configure(conf):
     conf.env.append_unique('CXXFLAGS', cxxflags)
 
     conf.env.append_value('INCLUDES', [
-        'external/nanojson/include/',
-        'external/nanojson/external/picojson/',
-        'external/nanojson/external/boost/preprocessor/include/',
+        'external/',
+        'external/boostpp/include/',
         'external/termbox/src/',
     ])
 
 def build(bld):
-    bld.recurse('external/termbox/src')
+    bld.stlib(source = bld.path.ant_glob("external/termbox/src/*.c"),
+              target = 'termbox',
+              name = 'termbox_static')
+
     bld.program(features='cxx cxxprogram',
                 target='coco',
                 source='coco.cpp',
+                includes = '.',
                 use = 'termbox_static')

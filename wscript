@@ -23,16 +23,16 @@ def options(opt):
 def configure(conf):
     conf.load('compiler_c compiler_cxx gnu_dirs')
 
-    target = conf.options.check_cxx_compiler
-    if target is None:
-        from waflib.Tools import compiler_cxx
-        target = compiler_cxx.default_compilers()[0]
-
-    if target == 'msvc':
+    if conf.options.check_cxx_compiler == 'msvc':
+        cflags = ['/EHsc']
         cxxflags = ['/EHsc']
-    elif target in ('g++', 'clang++'):
+    else:
         cxxflags = ['-O2', '-Wall', '-std=c++11']
+        cflags = ['-O2', '-Wall', '-std=c11']
+
+    conf.env.append_unique('CFLAGS', cflags)
     conf.env.append_unique('CXXFLAGS', cxxflags)
+
     conf.env.append_value('INCLUDES', [
         'external/nanojson/include/',
         'external/nanojson/external/picojson/',

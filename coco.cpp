@@ -10,27 +10,28 @@
 #include <tuple>
 #include <vector>
 
-enum class State {
-  Continue,
-  Escaped,
-  Selected,
-};
-
 class CocoClient {
+  enum class State {
+    Continue,
+    Escaped,
+    Selected,
+  };
+
   TermBox termbox;
 
   // states
-  std::vector<std::string> inputs, filtered, rendered;
+  std::vector<std::string> inputs;
+  std::vector<std::string> filtered;
   std::string query;
-  long selected = 0;
+
+  size_t cursor = 0;
   size_t offset = 0;
 
-  // configurations
-  std::string const query_header = "QUERY> ";
-  static constexpr unsigned y_offset = 1;
+  std::string prompt = "QUERY> ";
+  unsigned y_offset = 1;
 
 public:
-  CocoClient(std::vector<std::string> inputs) : inputs(inputs), filtered(inputs), rendered(inputs) {}
+  CocoClient(std::vector<std::string> inputs) : inputs(inputs), filtered(inputs) {}
 
   std::tuple<bool, std::string> run()
   {
@@ -82,7 +83,7 @@ private:
 
   std::string selected_line() const
   {
-    return rendered.size() <= offset + selected ? std::string{} : rendered[offset + selected];
+    return cursor + offset < filtered.size() ? filtered[cursor + offset] : std::string{};
   }
 
   void push_query(uint32_t c)
@@ -101,40 +102,28 @@ private:
 
   void move_up()
   {
-    if (selected > -1) {
-      selected -= 1;
-    }
-
-    if (selected == -1) {
-      selected += 1;
-      if (offset > 0) {
-        offset -= 1;
-        rendered.assign(filtered.begin() + offset, filtered.end());
-      }
+    if (cursor == 0) {
+      offset = std::max(0, (int)offset - 1);
+    } else {
+      cursor--;
     }
   }
 
   void move_down()
   {
-    if (((rendered.size() < termbox.height() - 1) && (selected < rendered.size() - 1)) ||
-        ((rendered.size() > termbox.height() - 1) && (selected < termbox.height() - 1))) {
-      selected += 1;
+    int const height = termbox.height();
+    if (cursor == height - y_offset - 1) {
+      offset = std::min((int)offset + 1, std::max(0, (int)filtered.size() - height - 1));
     }
-
-    if (selected == termbox.height() - 1) {
-      selected -= 1;
-      if (offset < filtered.size() - 1) {
-        offset += 1;
-        rendered.assign(filtered.begin() + offset, filtered.end());
-      }
+    else {
+      cursor = std::min<size_t>(cursor + 1, height - y_offset - 1);
     }
   }
 
   void apply_filter()
   {
     filtered = filter();
-    rendered = filtered;
-    selected = 0;
+    cursor = 0;
     offset = 0;
   }
 
@@ -160,16 +149,17 @@ private:
   {
     termbox.clear();
 
-    std::string query_str = query_header + query;
+    std::string query_str = prompt + query;
     termbox.println(0, query_str, TB_WHITE, TB_BLACK);
     termbox.putchar(query_str.length(), 0, ' ', TB_WHITE, TB_WHITE);
 
-    for (int y = 0; y < (int)rendered.size(); ++y) {
-      if (y == selected) {
-        termbox.println(y + y_offset, rendered[y], TB_RED, TB_WHITE);
+    for (int y = 0; y < (int)filtered.size() - offset; ++y) {
+      std::string line = filtered[y + offset];
+      if (y == cursor) {
+        termbox.println(y + y_offset, line, TB_RED, TB_WHITE);
       }
       else {
-        termbox.println(y + y_offset, rendered[y], TB_WHITE, TB_BLACK);
+        termbox.println(y + y_offset, line, TB_WHITE, TB_BLACK);
       }
     }
 

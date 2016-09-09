@@ -1,12 +1,12 @@
 #include <termbox.h>
-#include <cstdint>
 #include <nanojson.hpp>
 
-#include <algorithm>
+#include <cstdint>
 #include <iostream>
-#include <string>
-#include <vector>
 #include <regex>
+#include <string>
+#include <tuple>
+#include <vector>
 
 class TermBox {
 public:
@@ -33,11 +33,14 @@ public:
 
 class CocoClient {
   TermBox termbox;
-  std::vector<std::string> inputs, render_items, filtered;
-  std::string query, selected_str;
+
+  // states
+  std::vector<std::string> inputs, filtered, rendered;
+  std::string query;
   long cursor, selected;
   size_t offset;
 
+  // configurations
   std::string const query_header = "QUERY> ";
   static constexpr unsigned y_offset = 1;
 
@@ -54,23 +57,24 @@ public:
       tb_event ev;
       tb_poll_event(&ev);
 
-      if (handle_event(ev))
-        break;
+      bool quit;
+      std::string selected_str;
+      std::tie(quit, selected_str) = handle_event(ev);
+      if (quit) {
+        return selected_str;
+      }
     }
 
-    return selected_str;
+    return {};
   }
 
-  bool handle_event(tb_event& ev)
+  std::tuple<bool, std::string> handle_event(tb_event& ev)
   {
     if (ev.key == TB_KEY_ENTER) {
-      if (!filtered.empty()) {
-        selected_str = render_items[offset + selected];
-      }
-      return true;
+      return std::make_tuple(true, filtered.empty() ? std::string{} : rendered[offset + selected]);
     }
     else if (ev.key == TB_KEY_ESC) {
-      return true;
+      return std::make_tuple(true, std::string{});
     }
     else if (ev.key == TB_KEY_BACKSPACE || ev.key == TB_KEY_BACKSPACE2) {
       if (!query.empty()) {
@@ -90,20 +94,18 @@ public:
         selected += 1;
         if (offset > 0) {
           offset -= 1;
-
-          render_items.resize(filtered.size() - offset);
-          std::copy(filtered.begin() + offset, filtered.end(), render_items.begin());
+          rendered.assign(filtered.begin() + offset, filtered.end());
         }
       }
     }
     else if (ev.key == TB_KEY_ARROW_DOWN) {
-      if (cursor < render_items.size() - 1) {
+      if (cursor < rendered.size() - 1) {
         cursor += 1;
       }
-      if ((render_items.size() < tb_height() - 1) && (selected < render_items.size() - 1)) {
+      if ((rendered.size() < tb_height() - 1) && (selected < rendered.size() - 1)) {
         selected += 1;
       }
-      else if ((render_items.size() > tb_height() - 1) && (selected < tb_height() - 1)) {
+      else if ((rendered.size() > tb_height() - 1) && (selected < tb_height() - 1)) {
         selected += 1;
       }
 
@@ -111,9 +113,7 @@ public:
         selected -= 1;
         if (offset < filtered.size() - 1) {
           offset += 1;
-
-          render_items.resize(filtered.size() - offset);
-          std::copy(filtered.begin() + offset, filtered.end(), render_items.begin());
+          rendered.assign(filtered.begin() + offset, filtered.end());
         }
       }
     }
@@ -121,14 +121,15 @@ public:
       query.push_back(ev.ch);
       apply_filter();
     }
-    return false;
+
+    return std::make_tuple(false, std::string{});
   }
 
 private:
   void apply_filter()
   {
     filtered = filter();
-    render_items = filtered;
+    rendered = filtered;
     selected = 0;
     cursor = 0;
     offset = 0;
@@ -154,41 +155,30 @@ private:
 
   void update_items() const
   {
+    std::string query_str = query_header + query;
+
     tb_clear();
 
-    print_query();
-    for (int y = 0; y < (int)render_items.size(); ++y) {
-      print_line(render_items[y], y, y == selected);
+    print_line(0, query_str, TB_WHITE, TB_BLACK);
+    tb_change_cell(query_str.length(), 0, ' ', TB_WHITE, TB_WHITE);
+
+    for (int y = 0; y < (int)rendered.size(); ++y) {
+      if (y == selected) {
+        print_line(y + y_offset, rendered[y], TB_RED, TB_WHITE);
+      }
+      else {
+        print_line(y + y_offset, rendered[y], TB_WHITE, TB_BLACK);
+      }
     }
 
     tb_present();
   }
 
-  void print_query() const
-  {
-    std::string query_str = query_header + query;
-
-    for (int x = 0; x < tb_width(); ++x) {
-      auto const c = static_cast<uint32_t>(x < query_str.length() ? query_str[x] : ' ');
-      if (x == query_str.length()) {
-        tb_change_cell(x, 0, c, TB_WHITE, TB_WHITE);
-      }
-      else {
-        tb_change_cell(x, 0, c, TB_WHITE, TB_BLACK);
-      }
-    }
-  }
-
-  void print_line(std::string line, unsigned y, bool selected) const
+  void print_line(unsigned y, std::string const& line, std::uint16_t fg, std::uint16_t bg) const
   {
     for (int x = 0; x < tb_width(); ++x) {
-      auto const c = static_cast<uint32_t>(x < line.length() ? line[x] : ' ');
-      if (selected) {
-        tb_change_cell(x, y + y_offset, c, TB_RED, TB_WHITE);
-      }
-      else {
-        tb_change_cell(x, y + y_offset, c, TB_WHITE, TB_BLACK);
-      }
+      auto const ch = static_cast<uint32_t>(x < line.length() ? line[x] : ' ');
+      tb_change_cell(x, y, ch, fg, bg);
     }
   }
 };

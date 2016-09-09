@@ -10,6 +10,11 @@
 #include <tuple>
 #include <vector>
 
+enum class State {
+  Continue,
+  Escaped,
+  Selected,
+};
 
 class CocoClient {
   TermBox termbox;
@@ -17,99 +22,119 @@ class CocoClient {
   // states
   std::vector<std::string> inputs, filtered, rendered;
   std::string query;
-  long cursor, selected;
-  size_t offset;
+  long selected = 0;
+  size_t offset = 0;
 
   // configurations
   std::string const query_header = "QUERY> ";
   static constexpr unsigned y_offset = 1;
 
 public:
-  CocoClient(std::vector<std::string> inputs) : inputs{std::move(inputs)} {}
+  CocoClient(std::vector<std::string> inputs) : inputs(inputs), filtered(inputs), rendered(inputs) {}
 
-  std::string select_line()
+  std::tuple<bool, std::string> run()
   {
-    apply_filter();
+    render_items();
 
     while (true) {
-      render();
       Event ev = termbox.poll_event();
 
-      bool quit;
+      State state;
       std::string selected_str;
-      std::tie(quit, selected_str) = handle_event(ev);
-      if (quit) {
-        return selected_str;
+      std::tie(state, selected_str) = handle_event(ev);
+      if (state == State::Selected) {
+        return std::make_tuple(true, selected_str);
       }
-    }
-
-    return {};
-  }
-
-  std::tuple<bool, std::string> handle_event(Event const& ev)
-  {
-    if (ev.is_key(TB_KEY_ENTER)) {
-      return std::make_tuple(true, filtered.empty() ? std::string{} : rendered[offset + selected]);
-    }
-    else if (ev.is_key(TB_KEY_ESC)) {
-      return std::make_tuple(true, std::string{});
-    }
-    else if (ev.is_key(TB_KEY_BACKSPACE) || ev.is_key(TB_KEY_BACKSPACE2)) {
-      if (!query.empty()) {
-        query.pop_back();
-        apply_filter();
-      }
-    }
-    else if (ev.is_key(TB_KEY_ARROW_UP)) {
-      if (selected > -1) {
-        selected -= 1;
-      }
-      if (cursor > 0) {
-        cursor -= 1;
+      else if (state == State::Escaped) {
+        break;
       }
 
-      if (selected == -1) {
-        selected += 1;
-        if (offset > 0) {
-          offset -= 1;
-          rendered.assign(filtered.begin() + offset, filtered.end());
-        }
-      }
-    }
-    else if (ev.is_key(TB_KEY_ARROW_DOWN)) {
-      if (cursor < rendered.size() - 1) {
-        cursor += 1;
-      }
-      if ((rendered.size() < termbox.height() - 1) && (selected < rendered.size() - 1)) {
-        selected += 1;
-      }
-      else if ((rendered.size() > termbox.height() - 1) && (selected < termbox.height() - 1)) {
-        selected += 1;
-      }
-
-      if (selected == termbox.height() - 1) {
-        selected -= 1;
-        if (offset < filtered.size() - 1) {
-          offset += 1;
-          rendered.assign(filtered.begin() + offset, filtered.end());
-        }
-      }
-    }
-    else if (ev.is_char()) {
-      query.push_back(ev.as_char());
-      apply_filter();
+      render_items();
     }
 
     return std::make_tuple(false, std::string{});
   }
 
 private:
+  std::tuple<State, std::string> handle_event(Event const& ev)
+  {
+    if (ev.is_key(TB_KEY_ENTER)) {
+      return std::make_tuple(filtered.empty() ? State::Escaped : State::Selected, selected_line());
+    }
+    else if (ev.is_key(TB_KEY_ESC)) {
+      return std::make_tuple(State::Escaped, std::string{});
+    }
+    else if (ev.is_key(TB_KEY_ARROW_UP)) {
+      move_up();
+    }
+    else if (ev.is_key(TB_KEY_ARROW_DOWN)) {
+      move_down();
+    }
+    else if (ev.is_key(TB_KEY_BACKSPACE) || ev.is_key(TB_KEY_BACKSPACE2)) {
+      pop_query();
+    }
+    else if (ev.is_char()) {
+      push_query(ev.as_char());
+    }
+
+    return std::make_tuple(State::Continue, std::string{});
+  }
+
+  std::string selected_line() const
+  {
+    return rendered.size() <= offset + selected ? std::string{} : rendered[offset + selected];
+  }
+
+  void push_query(uint32_t c)
+  {
+    query.push_back(c);
+    apply_filter();
+  }
+
+  void pop_query()
+  {
+    if (!query.empty()) {
+      query.pop_back();
+      apply_filter();
+    }
+  }
+
+  void move_up()
+  {
+    if (selected > -1) {
+      selected -= 1;
+    }
+
+    if (selected == -1) {
+      selected += 1;
+      if (offset > 0) {
+        offset -= 1;
+        rendered.assign(filtered.begin() + offset, filtered.end());
+      }
+    }
+  }
+
+  void move_down()
+  {
+    if (((rendered.size() < termbox.height() - 1) && (selected < rendered.size() - 1)) ||
+        ((rendered.size() > termbox.height() - 1) && (selected < termbox.height() - 1))) {
+      selected += 1;
+    }
+
+    if (selected == termbox.height() - 1) {
+      selected -= 1;
+      if (offset < filtered.size() - 1) {
+        offset += 1;
+        rendered.assign(filtered.begin() + offset, filtered.end());
+      }
+    }
+  }
+
   void apply_filter()
   {
     filtered = filter();
     rendered = filtered;
     selected = 0;
-    cursor = 0;
     offset = 0;
   }
 
@@ -131,7 +156,7 @@ private:
     }
   }
 
-  void render()
+  void render_items()
   {
     termbox.clear();
 
@@ -161,14 +186,15 @@ int main()
     inputs.push_back(std::regex_replace(line, ansi, ""));
   }
 
-  std::string selected;
+  bool selected;
+  std::string selected_str;
   {
     auto cli = CocoClient{std::move(inputs)};
-    selected = cli.select_line();
+    std::tie(selected, selected_str) = cli.run();
   }
 
-  if (!selected.empty()) {
-    std::cout << selected << std::endl;
+  if (selected) {
+    std::cout << selected_str << std::endl;
   }
   return 0;
 }

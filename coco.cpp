@@ -1,5 +1,6 @@
 #include <termbox.hpp>
 #include <nanojson.hpp>
+#include <cmdline.h>
 
 #include <cassert>
 #include <cstdint>

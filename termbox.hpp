@@ -55,7 +55,7 @@ private:
   {
     int error = tb_init();
     if (error) {
-      throw std::runtime_error{"tb_init() failed with error code " + std::to_string(error)};
+      throw std::runtime_error{"tb_init() failed"};
     }
   }
 };

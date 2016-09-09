@@ -1,6 +1,7 @@
-#include <termbox.h>
+#include <termbox.hpp>
 #include <nanojson.hpp>
 
+#include <cassert>
 #include <cstdint>
 #include <iostream>
 #include <regex>
@@ -8,28 +9,6 @@
 #include <tuple>
 #include <vector>
 
-class TermBox {
-public:
-  TermBox() { init(); }
-
-  ~TermBox() noexcept
-  {
-    try {
-      tb_shutdown();
-    }
-    catch (...) {
-    }
-  }
-
-  void init()
-  {
-    int error = tb_init();
-    if (error) {
-      std::cerr << "tb_init() failed with error code " << error << std::endl;
-      std::exit(error);
-    }
-  }
-};
 
 class CocoClient {
   TermBox termbox;
@@ -52,10 +31,8 @@ public:
     apply_filter();
 
     while (true) {
-      update_items();
-
-      tb_event ev;
-      tb_poll_event(&ev);
+      render();
+      Event ev = termbox.poll_event();
 
       bool quit;
       std::string selected_str;
@@ -68,21 +45,21 @@ public:
     return {};
   }
 
-  std::tuple<bool, std::string> handle_event(tb_event& ev)
+  std::tuple<bool, std::string> handle_event(Event const& ev)
   {
-    if (ev.key == TB_KEY_ENTER) {
+    if (ev.is_key(TB_KEY_ENTER)) {
       return std::make_tuple(true, filtered.empty() ? std::string{} : rendered[offset + selected]);
     }
-    else if (ev.key == TB_KEY_ESC) {
+    else if (ev.is_key(TB_KEY_ESC)) {
       return std::make_tuple(true, std::string{});
     }
-    else if (ev.key == TB_KEY_BACKSPACE || ev.key == TB_KEY_BACKSPACE2) {
+    else if (ev.is_key(TB_KEY_BACKSPACE) || ev.is_key(TB_KEY_BACKSPACE2)) {
       if (!query.empty()) {
         query.pop_back();
         apply_filter();
       }
     }
-    else if (ev.key == TB_KEY_ARROW_UP) {
+    else if (ev.is_key(TB_KEY_ARROW_UP)) {
       if (selected > -1) {
         selected -= 1;
       }
@@ -98,18 +75,18 @@ public:
         }
       }
     }
-    else if (ev.key == TB_KEY_ARROW_DOWN) {
+    else if (ev.is_key(TB_KEY_ARROW_DOWN)) {
       if (cursor < rendered.size() - 1) {
         cursor += 1;
       }
-      if ((rendered.size() < tb_height() - 1) && (selected < rendered.size() - 1)) {
+      if ((rendered.size() < termbox.height() - 1) && (selected < rendered.size() - 1)) {
         selected += 1;
       }
-      else if ((rendered.size() > tb_height() - 1) && (selected < tb_height() - 1)) {
+      else if ((rendered.size() > termbox.height() - 1) && (selected < termbox.height() - 1)) {
         selected += 1;
       }
 
-      if (selected == tb_height() - 1) {
+      if (selected == termbox.height() - 1) {
         selected -= 1;
         if (offset < filtered.size() - 1) {
           offset += 1;
@@ -117,8 +94,8 @@ public:
         }
       }
     }
-    else if ((ev.ch != 0) || (ev.key == 32 && ev.ch == 0)) {
-      query.push_back(ev.ch);
+    else if (ev.is_char()) {
+      query.push_back(ev.as_char());
       apply_filter();
     }
 
@@ -153,33 +130,24 @@ private:
     }
   }
 
-  void update_items() const
+  void render()
   {
+    termbox.clear();
+
     std::string query_str = query_header + query;
-
-    tb_clear();
-
-    print_line(0, query_str, TB_WHITE, TB_BLACK);
-    tb_change_cell(query_str.length(), 0, ' ', TB_WHITE, TB_WHITE);
+    termbox.println(0, query_str, TB_WHITE, TB_BLACK);
+    termbox.putchar(query_str.length(), 0, ' ', TB_WHITE, TB_WHITE);
 
     for (int y = 0; y < (int)rendered.size(); ++y) {
       if (y == selected) {
-        print_line(y + y_offset, rendered[y], TB_RED, TB_WHITE);
+        termbox.println(y + y_offset, rendered[y], TB_RED, TB_WHITE);
       }
       else {
-        print_line(y + y_offset, rendered[y], TB_WHITE, TB_BLACK);
+        termbox.println(y + y_offset, rendered[y], TB_WHITE, TB_BLACK);
       }
     }
 
-    tb_present();
-  }
-
-  void print_line(unsigned y, std::string const& line, std::uint16_t fg, std::uint16_t bg) const
-  {
-    for (int x = 0; x < tb_width(); ++x) {
-      auto const ch = static_cast<uint32_t>(x < line.length() ? line[x] : ' ');
-      tb_change_cell(x, y, ch, fg, bg);
-    }
+    termbox.flush();
   }
 };
 

@@ -10,7 +10,8 @@
 
 class TermBox {
 public:
-  TermBox() = default;
+  TermBox() { init(); }
+
   ~TermBox() noexcept
   {
     try {
@@ -19,6 +20,7 @@ public:
     catch (...) {
     }
   }
+
   void init()
   {
     int error = tb_init();
@@ -40,33 +42,31 @@ class CocoClient {
   static constexpr unsigned y_offset = 1;
 
 public:
-  CocoClient()
-  {
-    for (std::string line; std::getline(std::cin, line);) {
-      inputs.push_back(line);
-    }
-    termbox.init();
-    apply_filter();
-  }
+  CocoClient(std::vector<std::string> inputs) : inputs{std::move(inputs)} {}
 
   std::string select_line()
   {
+    apply_filter();
+
     while (true) {
       update_items();
-      if (handle_event())
+
+      tb_event ev;
+      tb_poll_event(&ev);
+
+      if (handle_event(ev))
         break;
     }
 
     return selected_str;
   }
 
-  bool handle_event()
+  bool handle_event(tb_event& ev)
   {
-    tb_event ev;
-    tb_poll_event(&ev);
-
     if (ev.key == TB_KEY_ENTER) {
-      selected_str = render_items[offset + selected];
+      if (!filtered.empty()) {
+        selected_str = render_items[offset + selected];
+      }
       return true;
     }
     else if (ev.key == TB_KEY_ESC) {
@@ -195,9 +195,16 @@ private:
 
 int main()
 {
+  std::regex ansi(R"(\x1B\[([0-9]{1,2}(;[0-9]{1,2})?)?[m|K])");
+
+  std::vector<std::string> inputs;
+  for (std::string line; std::getline(std::cin, line);) {
+    inputs.push_back(std::regex_replace(line, ansi, ""));
+  }
+
   std::string selected;
   {
-    CocoClient cli{};
+    auto cli = CocoClient{std::move(inputs)};
     selected = cli.select_line();
   }
 

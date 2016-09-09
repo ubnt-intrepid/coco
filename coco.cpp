@@ -113,10 +113,10 @@ private:
   {
     int const height = termbox.height();
     if (cursor == height - y_offset - 1) {
-      offset = std::min((int)offset + 1, std::max(0, (int)filtered.size() - height - 1));
+      offset = std::min<size_t>(offset + 1, std::max<int>(0, filtered.size() - height + y_offset));
     }
     else {
-      cursor = std::min<size_t>(cursor + 1, height - y_offset - 1);
+      cursor = std::min<size_t>(cursor + 1, std::min<size_t>(filtered.size() - offset - 1, height - y_offset - 1));
     }
   }
 

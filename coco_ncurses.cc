@@ -80,11 +80,11 @@ std::string get_utf8_char() {
 }
 
 
-enum class Status {
-  Selected, Escaped, Continue,
-};
-
 class Coco {
+  enum class Status {
+    Selected, Escaped, Continue,
+  };
+
   std::vector<std::string> const& lines;
   std::string query;
   size_t cursor = 0;
@@ -95,12 +95,11 @@ public:
   {
   }
 
+  std::tuple<bool, std::string> run();
+
+private:
   void render_screen();
   Status handle_key_event();
-
-  std::string get_selection() const {
-    return lines[cursor];
-  }
 };
 
 void Coco::render_screen()
@@ -120,7 +119,7 @@ void Coco::render_screen()
   ::wrefresh(stdscr);
 }
 
-Status Coco::handle_key_event()
+auto Coco::handle_key_event() -> Status
 {
   int ch = ::getch();
   if (ch == 10) { // 10 = enter
@@ -162,6 +161,24 @@ Status Coco::handle_key_event()
   throw std::logic_error{"unreachable"};
 }
 
+std::tuple<bool, std::string> Coco::run()
+{
+  render_screen();
+  
+  while (true) {
+    auto result = handle_key_event();
+    if (result == Status::Selected) {
+      return std::make_tuple(true, lines[cursor]);
+    } else if (result == Status::Escaped) {
+      break;
+    }
+    render_screen();
+  }
+  
+  return std::make_tuple(false, ""s);
+}
+
+
 class Ncurses {
 public:
   Ncurses() {
@@ -176,26 +193,6 @@ public:
   }
 };
 
-std::tuple<bool, std::string> do_selection(std::vector<std::string> const& lines)
-{
-  Ncurses ncurses;
-  
-  Coco coco{lines};
-
-  coco.render_screen();
-  while (true) {
-    auto result = coco.handle_key_event();
-    if (result == Status::Selected) {
-      return std::make_tuple(true, coco.get_selection());
-    } else if (result == Status::Escaped) {
-      return std::make_tuple(false, ""s);
-    }
-
-    coco.render_screen();
-  }
-
-  throw std::logic_error{"unreachable"};
-}
 
 int main()
 {
@@ -211,8 +208,12 @@ int main()
 
     bool is_selected;
     std::string selection;
-    std::tie(is_selected, selection) = do_selection(lines);
-  
+    {
+      Ncurses ncurses;
+      Coco coco{lines};
+      std::tie(is_selected, selection) = coco.run();
+    }
+
     if (is_selected) {
       std::cout << selection << std::endl; 
     }

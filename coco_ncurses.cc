@@ -17,7 +17,7 @@ bool is_utf8_first(uint8_t ch) {
     return true;  // ascii (0b0.......)
   }
 
-  if ((ch & 0xC0) != 0x80) {
+  if ((ch & 0xC0) == 0x80) {
     return false; // 0b10......
   }
 
@@ -79,6 +79,16 @@ std::string get_utf8_char() {
   return std::string(buf.data(), buf.data() + len);
 }
 
+void pop_back_utf8(std::string& str)
+{
+  if (str.empty())
+    return;
+
+  auto cp = str.data() + str.size();
+  while (--cp >= str.data() && ((*cp & 0b10000000) && !(*cp & 0b01000000))) {}
+  if (cp >= str.data())
+    str.resize(cp - str.data());
+}
 
 class Coco {
   enum class Status {
@@ -104,17 +114,16 @@ private:
 
 void Coco::render_screen()
 {
-  ::werase(stdscr);
-
   std::string query_str = "QUERY> " + query;
-  mvwaddstr(stdscr, 0, 0, query_str.c_str());
-
-  for (int y = 0; y < lines.size(); ++y) {
+ 
+  ::werase(stdscr);
+ 
+ for (int y = 0; y < lines.size(); ++y) {
     mvwaddstr(stdscr, y+1, 1, lines[y].c_str());
   }
   mvwaddstr(stdscr, cursor+1, 0, ">");
 
-  move(0, query_str.length());
+  mvwaddstr(stdscr, 0, 0, query_str.c_str());
 
   ::wrefresh(stdscr);
 }
@@ -149,16 +158,18 @@ auto Coco::handle_key_event() -> Status
   }
   else if (ch == 127) {  // 127 = backspace
     if (!query.empty()) {
-      query.pop_back();
+      pop_back_utf8(query);
     }
     return Status::Continue;
   }
-  else { // character
-    query.push_back(ch);
+  else if (is_utf8_first(ch & 0xFF)) { // utf-8 character
+    ::ungetch(ch);
+    auto ch = get_utf8_char();
+    query += ch;
     return Status::Continue;
   }
 
-  throw std::logic_error{"unreachable"};
+  throw std::logic_error(std::string(__FUNCTION__) + ": unreachable");
 }
 
 std::tuple<bool, std::string> Coco::run()

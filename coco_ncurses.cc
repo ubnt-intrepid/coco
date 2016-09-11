@@ -182,6 +182,7 @@ std::tuple<bool, std::string> Coco::run()
 class Ncurses {
 public:
   Ncurses() {
+    freopen("/dev/tty", "rw", stdin);
     ::initscr();
     ::noecho();
     ::cbreak();

@@ -1,6 +1,8 @@
 *.exe
 .waf-*/
 .waf3-*/
+waf-*/
+waf3-*/
 build/
 .lock-waf*
 

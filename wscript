@@ -36,7 +36,7 @@ def build(bld):
                 use = 'termbox_static')
 
     bld.program(features='cxx cxxprogram',
-                target='coco_ncurses',
+                target='ncoco',
                 source='coco_ncurses.cc',
                 includes = '.',
                 use = 'NCURSESW')

@@ -32,10 +32,10 @@ bool is_utf8_cont(uint8_t ch) {
   return (ch & 0xC0) == 0x80;
 }
 
-int get_utf8_char_length(uint8_t ch)
+size_t get_utf8_char_length(uint8_t ch)
 {
   if (!is_utf8_first(ch)) {
-    return -1;
+    throw std::runtime_error(string(__FUNCTION__) + ": the first byte is not UTF8");
   }
 
 	for (int i = 0; i < 6; ++i) {
@@ -44,36 +44,22 @@ int get_utf8_char_length(uint8_t ch)
 		}
 	}
 
-  return -2;
+  throw std::runtime_error(string(__FUNCTION__) + ": unreachable");
 }
 
 std::string get_utf8_char() {
-  std::array<int8_t, 6> buf{0};
-  std::array<int, 6> rawbuf{0};
+  std::array<uint8_t, 6> buf{0};
 
-  // get the number of bytes of UTF8 character.
-  int ch0_raw = ::getch();
-  int8_t ch0 = static_cast<int8_t>(ch0_raw & 0x000000FF);
-  int len = get_utf8_char_length(ch0);
-  if (len < 0) {
-    ::ungetch(ch0_raw);
-    throw std::runtime_error(string(__FUNCTION__) + ": the first byte is not UTF8");
-  }
+  auto ch0 = static_cast<uint8_t>(::getch() & 0x000000FF);
+  size_t len = get_utf8_char_length(ch0);
   buf[0] = ch0;
-  rawbuf[0] = ch0_raw;
-
-  for (int i = 1; i < len; ++i) {
-    int ch_raw = ::getch();
-    int8_t ch = static_cast<int8_t>(ch_raw & 0x000000FF);
+  
+  for (size_t i = 1; i < len; ++i) {
+    auto ch = static_cast<uint8_t>(::getch() & 0x000000FF);
     if (!is_utf8_cont(ch)) {
-      ::ungetch(ch_raw);
-      for (int k = i - 1; k >= 0; --k) {
-        ::ungetch(rawbuf[k]);
-      }
       throw std::runtime_error(string(__FUNCTION__) + ": wrong byte exists");
     }
     buf[i] = ch;
-    rawbuf[i] = ch_raw;
   }
 
   return std::string(buf.data(), buf.data() + len);

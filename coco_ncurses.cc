@@ -12,14 +12,30 @@ using std::string;
 using std::tuple;
 using std::vector;
 
+bool is_utf8_first(uint8_t ch) {
+  if ((ch & 0x80) == 0) {
+    return true;  // ascii (0b0.......)
+  }
+
+  if ((ch & 0xC0) != 0x80) {
+    return false; // 0b10......
+  }
+
+  if ((ch & 0xFE) == 0xFE) {
+    return false; // 0b1111111.
+  }
+
+  return true;    // 0b11......
+}
+
+bool is_utf8_cont(uint8_t ch) {
+  return (ch & 0xC0) == 0x80;
+}
 
 int get_utf8_char_length(uint8_t ch)
 {
-  if ((ch & 0xC0) == 0x80) {
+  if (!is_utf8_first(ch)) {
     return -1;
-  }
-  else if ((ch & 0xFE) == 0xFE) {
-    return -2;
   }
 
 	for (int i = 0; i < 6; ++i) {
@@ -27,11 +43,8 @@ int get_utf8_char_length(uint8_t ch)
 	    return std::max(0, i - 1) + 1;
 		}
 	}
-  return -3;
-}
 
-bool is_utf8_cont(uint8_t ch) {
-  return (ch & 0xC0) == 0x80;
+  return -2;
 }
 
 std::string get_utf8_char() {
@@ -67,9 +80,14 @@ std::string get_utf8_char() {
 }
 
 
+enum class Status {
+  Selected, Escaped, Continue,
+};
+
 class Coco {
   std::vector<std::string> const& lines;
   std::string query;
+  size_t cursor = 0;
 
 public:
   Coco(std::vector<std::string> const& lines)
@@ -78,88 +96,130 @@ public:
   }
 
   void render_screen();
-  bool handle_key_event();
+  Status handle_key_event();
+
+  std::string get_selection() const {
+    return lines[cursor];
+  }
 };
 
 void Coco::render_screen()
 {
-  ::wclear(stdscr);
+  ::werase(stdscr);
 
-  ::wmove(stdscr, 0, 0);
-  ::waddstr(stdscr, query.c_str());
+  std::string query_str = "QUERY> " + query;
+  mvwaddstr(stdscr, 0, 0, query_str.c_str());
+
+  for (int y = 0; y < lines.size(); ++y) {
+    mvwaddstr(stdscr, y+1, 1, lines[y].c_str());
+  }
+  mvwaddstr(stdscr, cursor+1, 0, ">");
+
+  move(0, query_str.length());
+
   ::wrefresh(stdscr);
 }
 
-bool Coco::handle_key_event()
+Status Coco::handle_key_event()
 {
   int ch = ::getch();
   if (ch == 10) { // 10 = enter
-    return false;
+    return Status::Selected;
   }
   else if (ch == 27) {
     ::nodelay(stdscr, true);
     int ch = ::getch();
     if (ch == -1) { // Escape
-      return false;
+      return Status::Escaped;
     }
     ::ungetch(ch);
     ::nodelay(stdscr, false);
+    return Status::Continue;
   }
-
   else if (ch == KEY_UP) {
-    return true;
+    if (cursor > 0) {
+      cursor--;
+    }
+    return Status::Continue;
   }
   else if (ch == KEY_DOWN) {
-    return true;
+    if (cursor < lines.size() - 1) {
+      cursor++;
+    }
+    return Status::Continue;
   }
   else if (ch == 127) {  // 127 = backspace
-    query = ""s;
-    return true;
+    if (!query.empty()) {
+      query.pop_back();
+    }
+    return Status::Continue;
   }
-  else {  // normal string
-    ::ungetch(ch);
-    query = get_utf8_char();
-    return true;
+  else { // character
+    query.push_back(ch);
+    return Status::Continue;
   }
 
   throw std::logic_error{"unreachable"};
 }
 
+class Ncurses {
+public:
+  Ncurses() {
+    ::initscr();
+    ::noecho();
+    ::cbreak();
+    ::keypad(stdscr, true);
+    ::ESCDELAY = 25;
+  }
+  ~Ncurses() {
+    ::endwin();
+  }
+};
+
 std::tuple<bool, std::string> do_selection(std::vector<std::string> const& lines)
 {
-  ::initscr();
-  ::noecho();
-  ::cbreak();
-  ::keypad(stdscr, true);
-  ::ESCDELAY = 25;
-
+  Ncurses ncurses;
+  
   Coco coco{lines};
 
   coco.render_screen();
-  while (coco.handle_key_event()) {
+  while (true) {
+    auto result = coco.handle_key_event();
+    if (result == Status::Selected) {
+      return std::make_tuple(true, coco.get_selection());
+    } else if (result == Status::Escaped) {
+      return std::make_tuple(false, ""s);
+    }
+
     coco.render_screen();
   }
 
-  ::endwin();
-  return std::make_tuple(false, ""s);
+  throw std::logic_error{"unreachable"};
 }
 
 int main()
 {
   std::setlocale(LC_ALL, "");
 
-  // read lines from stdin.
-  std::regex ansi(R"(\x1B\[([0-9]{1,2}(;[0-9]{1,2})?)?[m|K])");
-  std::vector<std::string> lines;
-  for (std::string line; std::getline(std::cin, line);) {
-    lines.push_back(std::regex_replace(line, ansi, ""));
+  try {
+    // read lines from stdin.
+    std::regex ansi(R"(\x1B\[([0-9]{1,2}(;[0-9]{1,2})?)?[m|K])");
+    std::vector<std::string> lines;
+    for (std::string line; std::getline(std::cin, line);) {
+      lines.push_back(std::regex_replace(line, ansi, ""));
+    }
+
+    bool is_selected;
+    std::string selection;
+    std::tie(is_selected, selection) = do_selection(lines);
+  
+    if (is_selected) {
+      std::cout << selection << std::endl; 
+    }
+    return 0;
   }
-
-  bool is_selected;
-  std::string selection;
-  std::tie(is_selected, selection) = do_selection(lines);
-
-  if (is_selected) {
-    std::cout << selection << std::endl; 
+  catch (std::exception& e) {
+    std::cerr << "An error is thrown: " << e.what() << std::endl;
+    return -1;
   }
 }

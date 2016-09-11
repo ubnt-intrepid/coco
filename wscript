@@ -1,43 +1,28 @@
 #!/usr/bin/env python
 # vim: set fileencoding=utf-8
-#
-# File:     wscript
-# Author:   Yusuke Sasaki <y_sasaki@nuem.nagoya-u.ac.jp>
-# License:  MIT License
-# Created:  2015-02-19T22:41:51
 
-import platform
+(APPNAME, VERSION) = ('coco', '0.0.1')
+(top, out) = ('.', './build')
 
-APPNAME = 'coco'
-VERSION = '0.0.1'
-
-top = '.'
-out = 'build'
-
-def init(ctx):
-    pass
 
 def options(opt):
     opt.load('compiler_c compiler_cxx')
 
+
 def configure(conf):
     conf.load('compiler_c compiler_cxx gnu_dirs')
+    
+    conf.env.append_unique('CFLAGS', ['-O2', '-Wall', '-Wextra', '-std=c11'])
+    conf.env.append_unique('CXXFLAGS', ['-O2', '-Wall', '-Wextra', '-std=c++14'])
 
-    if conf.options.check_cxx_compiler == 'msvc':
-        cflags = ['/EHsc']
-        cxxflags = ['/EHsc']
-    else:
-        cxxflags = ['-O2', '-Wall', '-Wextra', '-std=c++11']
-        cflags = ['-O2', '-Wall', '-Wextra', '-std=c11']
-
-    conf.env.append_unique('CFLAGS', cflags)
-    conf.env.append_unique('CXXFLAGS', cxxflags)
-
+    conf.check_cfg(package = 'ncursesw', args = '--cflags --libs', uselib_store = 'NCURSESW')
+    
     conf.env.append_value('INCLUDES', [
         'external/',
         'external/boostpp/include/',
         'external/termbox/src/',
     ])
+
 
 def build(bld):
     bld.stlib(source = bld.path.ant_glob("external/termbox/src/*.c"),
@@ -49,3 +34,9 @@ def build(bld):
                 source='coco.cpp',
                 includes = '.',
                 use = 'termbox_static')
+
+    bld.program(features='cxx cxxprogram',
+                target='coco_ncurses',
+                source='coco_ncurses.cc',
+                includes = '.',
+                use = 'NCURSESW')

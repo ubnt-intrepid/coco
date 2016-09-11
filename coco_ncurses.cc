@@ -12,9 +12,10 @@ using std::string;
 using std::tuple;
 using std::vector;
 
-bool is_utf8_first(uint8_t ch) {
+bool is_utf8_first(uint8_t ch)
+{
   if ((ch & 0x80) == 0) {
-    return true;  // ascii (0b0.......)
+    return true; // ascii (0b0.......)
   }
 
   if ((ch & 0xC0) == 0x80) {
@@ -25,12 +26,10 @@ bool is_utf8_first(uint8_t ch) {
     return false; // 0b1111111.
   }
 
-  return true;    // 0b11......
+  return true; // 0b11......
 }
 
-bool is_utf8_cont(uint8_t ch) {
-  return (ch & 0xC0) == 0x80;
-}
+bool is_utf8_cont(uint8_t ch) { return (ch & 0xC0) == 0x80; }
 
 size_t get_utf8_char_length(uint8_t ch)
 {
@@ -38,22 +37,23 @@ size_t get_utf8_char_length(uint8_t ch)
     throw std::runtime_error(string(__FUNCTION__) + ": the first byte is not UTF8");
   }
 
-	for (int i = 0; i < 6; ++i) {
-		if ((ch & (0x01 << (7 - i))) == 0) {
-	    return std::max(1, i);
-		}
-	}
+  for (int i = 0; i < 6; ++i) {
+    if ((ch & (0x01 << (7 - i))) == 0) {
+      return std::max(1, i);
+    }
+  }
 
   throw std::runtime_error(string(__FUNCTION__) + ": unreachable");
 }
 
-std::string get_utf8_char() {
+std::string get_utf8_char()
+{
   std::array<uint8_t, 6> buf{0};
 
   auto ch0 = static_cast<uint8_t>(::getch() & 0x000000FF);
   size_t len = get_utf8_char_length(ch0);
   buf[0] = ch0;
-  
+
   for (size_t i = 1; i < len; ++i) {
     auto ch = static_cast<uint8_t>(::getch() & 0x000000FF);
     if (!is_utf8_cont(ch)) {
@@ -80,7 +80,9 @@ void pop_back_utf8(std::string& str)
 
 class Coco {
   enum class Status {
-    Selected, Escaped, Continue,
+    Selected,
+    Escaped,
+    Continue,
   };
 
   std::vector<std::string> const& lines;
@@ -89,10 +91,7 @@ class Coco {
   size_t cursor = 0;
 
 public:
-  Coco(std::vector<std::string> const& lines)
-    : lines(lines), filtered(lines)
-  {
-  }
+  Coco(std::vector<std::string> const& lines) : lines(lines), filtered(lines) {}
 
   std::tuple<bool, std::string> run();
 
@@ -106,13 +105,13 @@ private:
 void Coco::render_screen()
 {
   std::string query_str = "QUERY> " + query;
- 
+
   ::werase(stdscr);
- 
- for (size_t y = 0; y < filtered.size(); ++y) {
-    mvwaddstr(stdscr, y+1, 1, filtered[y].c_str());
+
+  for (size_t y = 0; y < filtered.size(); ++y) {
+    mvwaddstr(stdscr, y + 1, 1, filtered[y].c_str());
   }
-  mvwaddstr(stdscr, cursor+1, 0, ">");
+  mvwaddstr(stdscr, cursor + 1, 0, ">");
 
   mvwaddstr(stdscr, 0, 0, query_str.c_str());
 
@@ -147,7 +146,7 @@ auto Coco::handle_key_event() -> Status
     }
     return Status::Continue;
   }
-  else if (ch == 127) {  // 127 = backspace
+  else if (ch == 127) { // 127 = backspace
     if (!query.empty()) {
       pop_back_utf8(query);
       filter_by_query();
@@ -168,31 +167,32 @@ auto Coco::handle_key_event() -> Status
 std::tuple<bool, std::string> Coco::run()
 {
   render_screen();
-  
+
   while (true) {
     auto result = handle_key_event();
     if (result == Status::Selected) {
       return std::make_tuple(true, filtered[cursor]);
-    } else if (result == Status::Escaped) {
+    }
+    else if (result == Status::Escaped) {
       break;
     }
     render_screen();
   }
-  
+
   return std::make_tuple(false, ""s);
 }
 
 void Coco::filter_by_query()
 {
   cursor = 0;
-  
+
   if (query.empty()) {
     filtered = lines;
   }
   else {
     std::regex re(query);
     filtered.resize(0);
-    for (auto&& line: lines) {
+    for (auto&& line : lines) {
       if (std::regex_search(line, re)) {
         filtered.push_back(line);
       }
@@ -202,7 +202,8 @@ void Coco::filter_by_query()
 
 class Ncurses {
 public:
-  Ncurses() {
+  Ncurses()
+  {
     freopen("/dev/tty", "rw", stdin);
     ::initscr();
     ::noecho();
@@ -210,11 +211,8 @@ public:
     ::keypad(stdscr, true);
     ::ESCDELAY = 25;
   }
-  ~Ncurses() {
-    ::endwin();
-  }
+  ~Ncurses() { ::endwin(); }
 };
-
 
 int main()
 {
@@ -237,7 +235,7 @@ int main()
     }
 
     if (is_selected) {
-      std::cout << selection << std::endl; 
+      std::cout << selection << std::endl;
     }
     return 0;
   }

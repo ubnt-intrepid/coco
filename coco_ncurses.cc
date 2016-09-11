@@ -84,12 +84,13 @@ class Coco {
   };
 
   std::vector<std::string> const& lines;
+  std::vector<std::string> filtered;
   std::string query;
   size_t cursor = 0;
 
 public:
   Coco(std::vector<std::string> const& lines)
-    : lines(lines)
+    : lines(lines), filtered(lines)
   {
   }
 
@@ -98,6 +99,8 @@ public:
 private:
   void render_screen();
   Status handle_key_event();
+
+  void filter_by_query();
 };
 
 void Coco::render_screen()
@@ -106,8 +109,8 @@ void Coco::render_screen()
  
   ::werase(stdscr);
  
- for (int y = 0; y < lines.size(); ++y) {
-    mvwaddstr(stdscr, y+1, 1, lines[y].c_str());
+ for (size_t y = 0; y < filtered.size(); ++y) {
+    mvwaddstr(stdscr, y+1, 1, filtered[y].c_str());
   }
   mvwaddstr(stdscr, cursor+1, 0, ">");
 
@@ -139,7 +142,7 @@ auto Coco::handle_key_event() -> Status
     return Status::Continue;
   }
   else if (ch == KEY_DOWN) {
-    if (cursor < lines.size() - 1) {
+    if (cursor < filtered.size() - 1) {
       cursor++;
     }
     return Status::Continue;
@@ -147,6 +150,7 @@ auto Coco::handle_key_event() -> Status
   else if (ch == 127) {  // 127 = backspace
     if (!query.empty()) {
       pop_back_utf8(query);
+      filter_by_query();
     }
     return Status::Continue;
   }
@@ -154,6 +158,7 @@ auto Coco::handle_key_event() -> Status
     ::ungetch(ch);
     auto ch = get_utf8_char();
     query += ch;
+    filter_by_query();
     return Status::Continue;
   }
 
@@ -167,7 +172,7 @@ std::tuple<bool, std::string> Coco::run()
   while (true) {
     auto result = handle_key_event();
     if (result == Status::Selected) {
-      return std::make_tuple(true, lines[cursor]);
+      return std::make_tuple(true, filtered[cursor]);
     } else if (result == Status::Escaped) {
       break;
     }
@@ -177,6 +182,23 @@ std::tuple<bool, std::string> Coco::run()
   return std::make_tuple(false, ""s);
 }
 
+void Coco::filter_by_query()
+{
+  cursor = 0;
+  
+  if (query.empty()) {
+    filtered = lines;
+  }
+  else {
+    std::regex re(query);
+    filtered.resize(0);
+    for (auto&& line: lines) {
+      if (std::regex_search(line, re)) {
+        filtered.push_back(line);
+      }
+    }
+  }
+}
 
 class Ncurses {
 public:

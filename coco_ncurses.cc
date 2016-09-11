@@ -40,7 +40,7 @@ size_t get_utf8_char_length(uint8_t ch)
 
 	for (int i = 0; i < 6; ++i) {
 		if ((ch & (0x01 << (7 - i))) == 0) {
-	    return std::max(0, i - 1) + 1;
+	    return std::max(1, i);
 		}
 	}
 

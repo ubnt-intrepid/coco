@@ -70,10 +70,12 @@ void pop_back_utf8(std::string& str)
   if (str.empty())
     return;
 
-  auto cp = str.data() + str.size();
-  while (--cp >= str.data() && ((*cp & 0b10000000) && !(*cp & 0b01000000))) {}
-  if (cp >= str.data())
-    str.resize(cp - str.data());
+  for (size_t len = str.size() - 1; len >= 0; --len) {
+    if (!is_utf8_cont(str[len])) {
+      str.resize(len);
+      return;
+    }
+  }
 }
 
 class Coco {

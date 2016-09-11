@@ -89,6 +89,7 @@ class Coco {
   std::vector<std::string> filtered;
   std::string query;
   size_t cursor = 0;
+  size_t offset = 0;
 
 public:
   Coco(std::vector<std::string> const& lines) : lines(lines), filtered(lines) {}
@@ -108,8 +109,11 @@ void Coco::render_screen()
 
   ::werase(stdscr);
 
-  for (size_t y = 0; y < filtered.size(); ++y) {
-    mvwaddstr(stdscr, y + 1, 1, filtered[y].c_str());
+  int width, height;
+  getmaxyx(stdscr, height, width);
+
+  for (size_t y = 0; y < std::min<size_t>(filtered.size() - offset, width - 1); ++y) {
+    mvwaddstr(stdscr, y + 1, 1, filtered[y + offset].c_str());
   }
   mvwaddstr(stdscr, cursor + 1, 0, ">");
 
@@ -122,7 +126,7 @@ auto Coco::handle_key_event() -> Status
 {
   int ch = ::getch();
   if (ch == 10) { // 10 = enter
-    return Status::Selected;
+    return filtered.size() > 0 ? Status::Selected : Status::Escaped;
   }
   else if (ch == 27) {
     ::nodelay(stdscr, true);
@@ -135,14 +139,23 @@ auto Coco::handle_key_event() -> Status
     return Status::Continue;
   }
   else if (ch == KEY_UP) {
-    if (cursor > 0) {
+    if (cursor == 0) {
+      offset = std::max(0, (int)offset - 1);
+    }
+    else {
       cursor--;
     }
     return Status::Continue;
   }
   else if (ch == KEY_DOWN) {
-    if (cursor < filtered.size() - 1) {
-      cursor++;
+    int width, height;
+    getmaxyx(stdscr, height, width);
+
+    if (cursor == height - 2) {
+      offset = std::min<size_t>(offset + 1, std::max<int>(0, filtered.size() - height + 1));
+    }
+    else {
+      cursor = std::min<size_t>(cursor + 1, std::min<size_t>(filtered.size() - offset, height - 1) - 1);
     }
     return Status::Continue;
   }
@@ -185,6 +198,7 @@ std::tuple<bool, std::string> Coco::run()
 void Coco::filter_by_query()
 {
   cursor = 0;
+  offset = 0;
 
   if (query.empty()) {
     filtered = lines;

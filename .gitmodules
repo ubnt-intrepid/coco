@@ -1,6 +1,3 @@
-[submodule "external/termbox"]
-	path = external/termbox
-	url = https://github.com/nsf/termbox.git
 [submodule "external/preprocessor"]
 	path = external/boostpp
 	url = https://github.com/boostorg/preprocessor.git

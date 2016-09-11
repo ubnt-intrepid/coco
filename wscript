@@ -20,23 +20,12 @@ def configure(conf):
     conf.env.append_value('INCLUDES', [
         'external/',
         'external/boostpp/include/',
-        'external/termbox/src/',
     ])
 
 
 def build(bld):
-    bld.stlib(source = bld.path.ant_glob("external/termbox/src/*.c"),
-              target = 'termbox',
-              name = 'termbox_static')
-
     bld.program(features='cxx cxxprogram',
                 target='coco',
-                source='coco.cpp',
-                includes = '.',
-                use = 'termbox_static')
-
-    bld.program(features='cxx cxxprogram',
-                target='ncoco',
-                source='coco_ncurses.cc',
+                source='coco.cc',
                 includes = '.',
                 use = 'NCURSESW')

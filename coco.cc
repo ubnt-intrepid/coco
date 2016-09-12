@@ -10,6 +10,8 @@
 #include <functional>
 #include <nanojson.hpp>
 #include <cmdline.h>
+#include <cstdio>
+#include <memory>
 using namespace std::literals::string_literals;
 using std::string;
 using std::tuple;
@@ -69,10 +71,19 @@ public:
 
 // wrapper of Ncurses API.
 class Ncurses {
+  struct deleter_t {
+    void operator()(FILE* fd) { ::fclose(fd); }
+  };
+
+  std::unique_ptr<FILE, deleter_t> tty_in, tty_out;
+
 public:
   Ncurses()
   {
-    ::initscr();
+    tty_in.reset(fopen("/dev/tty", "r"));
+    tty_out.reset(fopen("/dev/tty", "w"));
+    ::newterm(getenv("TERM"), tty_out.get(), tty_in.get());
+
     ::noecho();
     ::cbreak();
     ::keypad(stdscr, true);
@@ -82,6 +93,8 @@ public:
     ::init_pair(1, COLOR_WHITE, COLOR_BLACK);
     ::init_pair(2, COLOR_RED, COLOR_WHITE);
   }
+
+  Ncurses(Ncurses&&) noexcept = default;
 
   ~Ncurses() { ::endwin(); }
 
@@ -333,10 +346,6 @@ int main(int argc, char const* argv[])
     config.read_from(argc, argv);
 
     Coco coco{config, lines};
-
-    // reopen file handlers of TTY for Ncurses session.
-    freopen("/dev/tty", "r", stdin);
-    freopen("/dev/tty", "w", stdout);
 
     // retrieve a selection from lines.
     // note that it ensures to shutdown ncurses when returned.

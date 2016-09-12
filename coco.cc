@@ -107,13 +107,13 @@ public:
 
   Event poll_event()
   {
-    int ch = ::getch();
+    int ch = ::wgetch(stdscr);
     if (ch == 10) {
       return Event{Key::Enter};
     }
     else if (ch == 27) {
       ::nodelay(stdscr, true);
-      int ch = ::getch();
+      int ch = ::wgetch(stdscr);
       if (ch == -1) {
         ::nodelay(stdscr, false);
         return Event{Key::Esc};
@@ -153,12 +153,12 @@ private:
   {
     std::array<uint8_t, 6> buf{0};
 
-    auto ch0 = static_cast<uint8_t>(::getch() & 0x000000FF);
+    auto ch0 = static_cast<uint8_t>(::wgetch(stdscr) & 0x000000FF);
     size_t len = get_utf8_char_length(ch0);
     buf[0] = ch0;
 
     for (size_t i = 1; i < len; ++i) {
-      auto ch = static_cast<uint8_t>(::getch() & 0x000000FF);
+      auto ch = static_cast<uint8_t>(::wgetch(stdscr) & 0x000000FF);
       if (!is_utf8_cont(ch)) {
         throw std::runtime_error(string(__FUNCTION__) + ": wrong byte exists");
       }

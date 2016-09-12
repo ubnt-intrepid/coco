@@ -14,19 +14,7 @@ using std::vector;
 
 bool is_utf8_first(uint8_t ch)
 {
-  if ((ch & 0x80) == 0) {
-    return true; // ascii (0b0.......)
-  }
-
-  if ((ch & 0xC0) == 0x80) {
-    return false; // 0b10......
-  }
-
-  if ((ch & 0xFE) == 0xFE) {
-    return false; // 0b1111111.
-  }
-
-  return true; // 0b11......
+  return (ch & 0xC0) != 0x80 && (ch & 0xFE) != 0xFE && ((ch & 0x80) == 0 || (ch & 0xC0) == 0xC0);
 }
 
 bool is_utf8_cont(uint8_t ch) { return (ch & 0xC0) == 0x80; }

@@ -101,9 +101,13 @@ void Coco::render_screen()
   getmaxyx(stdscr, height, width);
 
   for (size_t y = 0; y < std::min<size_t>(filtered.size() - offset, width - 1); ++y) {
-    mvwaddstr(stdscr, y + 1, 1, filtered[y + offset].c_str());
+    mvwaddstr(stdscr, y + 1, 0, filtered[y + offset].c_str());
+    if (y == cursor) {
+      attrset(COLOR_PAIR(2));
+      mvwchgat(stdscr, y + 1, 0, -1, A_NORMAL, 2, nullptr);
+      attrset(COLOR_PAIR(1));
+    }
   }
-  mvwaddstr(stdscr, cursor + 1, 0, ">");
 
   mvwaddstr(stdscr, 0, 0, query_str.c_str());
 
@@ -212,6 +216,10 @@ public:
     ::cbreak();
     ::keypad(stdscr, true);
     ::ESCDELAY = 25;
+
+    start_color();
+    ::init_pair(1, COLOR_WHITE, COLOR_BLACK);
+    ::init_pair(2, COLOR_RED, COLOR_WHITE);
   }
   ~Ncurses() { ::endwin(); }
 };

@@ -66,6 +66,85 @@ void pop_back_utf8(std::string& str)
   }
 }
 
+enum class Key { Enter, Esc, Alt, Up, Down, Left, Right, Backspace, Char, Unknown };
+
+class Event {
+  Key key;
+  int mod;
+  std::string ch;
+
+public:
+  Event(Key key) : key{key}, mod{0}, ch{} {}
+  Event(int mod) : key{Key::Alt}, mod{mod}, ch{} {}
+  Event(std::string&& ch) : key{Key::Char}, mod{0}, ch{ch} {}
+
+  std::string const& as_chars() const { return ch; }
+
+  inline bool operator==(Key key) const { return this->key == key; }
+};
+
+Event poll_event()
+{
+  int ch = ::getch();
+  if (ch == 10) {
+    return Event{Key::Enter};
+  }
+  else if (ch == 27) {
+    ::nodelay(stdscr, true);
+    int ch = ::getch();
+    if (ch == -1) {
+      ::nodelay(stdscr, false);
+      return Event{Key::Esc};
+    }
+    else {
+      ::nodelay(stdscr, false);
+      return Event{ch};
+    }
+  }
+  else if (ch == KEY_UP) {
+    return Event{Key::Up};
+  }
+  else if (ch == KEY_DOWN) {
+    return Event{Key::Down};
+  }
+  else if (ch == KEY_LEFT) {
+    return Event{Key::Left};
+  }
+  else if (ch == KEY_RIGHT) {
+    return Event{Key::Right};
+  }
+  else if (ch == 127) {
+    return Event{Key::Backspace};
+  }
+  else if (is_utf8_first(ch & 0xFF)) {
+    ::ungetch(ch);
+    auto ch = get_utf8_char();
+    return Event{std::move(ch)};
+  }
+  else {
+    return Event{Key::Unknown};
+  }
+}
+
+// wrapper of Ncurses API.
+class Ncurses {
+public:
+  Ncurses()
+  {
+    ::initscr();
+    ::noecho();
+    ::cbreak();
+    ::keypad(stdscr, true);
+    ::ESCDELAY = 25;
+
+    start_color();
+    ::init_pair(1, COLOR_WHITE, COLOR_BLACK);
+    ::init_pair(2, COLOR_RED, COLOR_WHITE);
+  }
+  ~Ncurses() { ::endwin(); }
+};
+
+// represents a instance of Coco client.
 class Coco {
   enum class Status {
     Selected,
@@ -82,13 +161,13 @@ class Coco {
 public:
   Coco(std::vector<std::string> const& lines) : lines(lines), filtered(lines) {}
 
-  std::tuple<bool, std::string> run();
+  std::tuple<bool, std::string> select_line(Ncurses&& ncurses);
 
 private:
   void render_screen();
-  Status handle_key_event();
-
-  void filter_by_query();
+  Status handle_key_event(Event const& ev);
+  void update_filter_list();
+  std::vector<std::string> filter_by_regex(std::vector<std::string> const& lines) const;
 };
 
 void Coco::render_screen()
@@ -114,23 +193,15 @@ void Coco::render_screen()
   ::wrefresh(stdscr);
 }
 
-auto Coco::handle_key_event() -> Status
+auto Coco::handle_key_event(Event const& ev) -> Status
 {
-  int ch = ::getch();
-  if (ch == 10) { // 10 = enter
+  if (ev == Key::Enter) {
     return filtered.size() > 0 ? Status::Selected : Status::Escaped;
   }
-  else if (ch == 27) {
-    ::nodelay(stdscr, true);
-    int ch = ::getch();
-    if (ch == -1) { // Escape
-      return Status::Escaped;
-    }
-    ::ungetch(ch);
-    ::nodelay(stdscr, false);
-    return Status::Continue;
+  else if (ev == Key::Esc) {
+    return Status::Escaped;
   }
-  else if (ch == KEY_UP) {
+  else if (ev == Key::Up) {
     if (cursor == 0) {
       offset = std::max(0, (int)offset - 1);
     }
@@ -139,7 +210,7 @@ auto Coco::handle_key_event() -> Status
     }
     return Status::Continue;
   }
-  else if (ch == KEY_DOWN) {
+  else if (ev == Key::Down) {
     int width, height;
     getmaxyx(stdscr, height, width);
 
@@ -151,30 +222,31 @@ auto Coco::handle_key_event() -> Status
     }
     return Status::Continue;
   }
-  else if (ch == 127) { // 127 = backspace
+  else if (ev == Key::Backspace) {
     if (!query.empty()) {
       pop_back_utf8(query);
-      filter_by_query();
+      update_filter_list();
     }
     return Status::Continue;
   }
-  else if (is_utf8_first(ch & 0xFF)) { // utf-8 character
-    ::ungetch(ch);
-    auto ch = get_utf8_char();
-    query += ch;
-    filter_by_query();
+  else if (ev == Key::Char) {
+    query += ev.as_chars();
+    update_filter_list();
     return Status::Continue;
   }
-
-  throw std::logic_error(std::string(__FUNCTION__) + ": unreachable");
+  else {
+    return Status::Continue;
+  }
 }
 
-std::tuple<bool, std::string> Coco::run()
+std::tuple<bool, std::string> Coco::select_line(Ncurses&& ncurses)
 {
   render_screen();
 
   while (true) {
-    auto result = handle_key_event();
+    Event ev = poll_event();
+
+    auto result = handle_key_event(ev);
     if (result == Status::Selected) {
       return std::make_tuple(true, filtered[cursor]);
     }
@@ -187,41 +259,29 @@ std::tuple<bool, std::string> Coco::run()
   return std::make_tuple(false, ""s);
 }
 
-void Coco::filter_by_query()
+void Coco::update_filter_list()
 {
+  filtered = filter_by_regex(lines);
   cursor = 0;
   offset = 0;
+}
 
+std::vector<std::string> Coco::filter_by_regex(std::vector<std::string> const& lines) const
+{
   if (query.empty()) {
-    filtered = lines;
+    return lines;
   }
   else {
     std::regex re(query);
-    filtered.resize(0);
+    std::vector<std::string> filtered;
     for (auto&& line : lines) {
       if (std::regex_search(line, re)) {
         filtered.push_back(line);
       }
     }
+    return filtered;
   }
 }
-
-class Ncurses {
-public:
-  Ncurses()
-  {
-    ::initscr();
-    ::noecho();
-    ::cbreak();
-    ::keypad(stdscr, true);
-    ::ESCDELAY = 25;
-
-    start_color();
-    ::init_pair(1, COLOR_WHITE, COLOR_BLACK);
-    ::init_pair(2, COLOR_RED, COLOR_WHITE);
-  }
-  ~Ncurses() { ::endwin(); }
-};
 
 int main()
 {
@@ -235,17 +295,20 @@ int main()
       lines.push_back(std::regex_replace(line, ansi, ""));
     }
 
+    // Initialize Coco application.
+    Coco coco{lines};
+
+    // reopen file handlers of TTY for Ncurses session.
     freopen("/dev/tty", "r", stdin);
     freopen("/dev/tty", "w", stdout);
 
+    // retrieve a selection from lines.
+    // note that it ensures to shutdown ncurses when returned.
     bool is_selected;
     std::string selection;
-    {
-      Ncurses ncurses;
-      Coco coco{lines};
-      std::tie(is_selected, selection) = coco.run();
-    }
+    std::tie(is_selected, selection) = coco.select_line(Ncurses{});
 
+    // show selected line.
     if (is_selected) {
       std::cout << selection << std::endl;
     }

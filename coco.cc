@@ -210,7 +210,6 @@ class Ncurses {
 public:
   Ncurses()
   {
-    freopen("/dev/tty", "rw", stdin);
     ::initscr();
     ::noecho();
     ::cbreak();
@@ -235,6 +234,9 @@ int main()
     for (std::string line; std::getline(std::cin, line);) {
       lines.push_back(std::regex_replace(line, ansi, ""));
     }
+
+    freopen("/dev/tty", "r", stdin);
+    freopen("/dev/tty", "w", stdout);
 
     bool is_selected;
     std::string selection;

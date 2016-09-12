@@ -32,19 +32,27 @@ class Ncurses {
   };
 
   std::unique_ptr<FILE, deleter_t> tty_in, tty_out;
+  SCREEN* screen;
+  SCREEN* screen_orig; 
 
 public:
   Ncurses()
   {
+    // create a new terminal
     tty_in.reset(fopen("/dev/tty", "r"));
     tty_out.reset(fopen("/dev/tty", "w"));
-    ::newterm(getenv("TERM"), tty_out.get(), tty_in.get());
+    screen = ::newterm(getenv("TERM"), tty_out.get(), tty_in.get());
 
-    ::noecho();
-    ::cbreak();
-    ::keypad(stdscr, true);
-    ::ESCDELAY = 25;
+    // switch to the current screen.
+    screen_orig = ::set_term(screen);
 
+    // setup 
+    ::noecho();             // do not echo back characters
+    ::cbreak();             // without buffering
+    ::keypad(stdscr, true); // convert escape sequeces to key code
+    ::ESCDELAY = 25;        // set delay time
+
+    // initialize colormap.
     start_color();
     ::init_pair(1, COLOR_WHITE, COLOR_BLACK);
     ::init_pair(2, COLOR_RED, COLOR_WHITE);
@@ -52,20 +60,29 @@ public:
 
   Ncurses(Ncurses&&) noexcept = default;
 
-  ~Ncurses() { ::endwin(); }
+  ~Ncurses() {
+      // reset current screen.
+     ::endwin();
+
+     // switch to original screen. 
+     ::set_term(screen_orig);
+
+     // release all resources of current session.
+     ::delscreen(screen);
+  }
 
   void erase() { ::werase(stdscr); }
 
   void refresh() { ::wrefresh(stdscr); }
 
-  std::tuple<int, int> get_width_height() const
+  std::tuple<int, int> get_size() const
   {
     int width, height;
     getmaxyx(stdscr, height, width);
     return std::make_tuple(width, height);
   }
 
-  void add_string(int x, int y, std::string const& text) { mvwaddstr(stdscr, y, x, text.c_str()); }
+  void add_str(int x, int y, std::string const& text) { mvwaddstr(stdscr, y, x, text.c_str()); }
 
   void change_attr(int x, int y, int n, int col)
   {

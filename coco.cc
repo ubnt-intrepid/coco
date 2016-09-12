@@ -98,17 +98,17 @@ private:
 
     term.erase();
 
-    int width;
-    std::tie(width, std::ignore) = term.get_width_height();
+    int height;
+    std::tie(std::ignore, height) = term.get_size();
 
-    for (size_t y = 0; y < std::min<size_t>(filtered.size() - offset, width - 1); ++y) {
-      term.add_string(0, y + 1, filtered[y + offset]);
+    for (size_t y = 0; y < std::min<size_t>(filtered.size() - offset, height - 1); ++y) {
+      term.add_str(0, y + 1, filtered[y + offset]);
       if (y == cursor) {
         term.change_attr(0, y + 1, -1, 2);
       }
     }
 
-    term.add_string(0, 0, query_str);
+    term.add_str(0, 0, query_str);
 
     term.refresh();
   }
@@ -132,7 +132,7 @@ private:
     }
     else if (ev == Key::Down) {
       int height;
-      std::tie(std::ignore, height) = term.get_width_height();
+      std::tie(std::ignore, height) = term.get_size();
 
       if (cursor == static_cast<size_t>(height - 1 - config.y_offset)) {
         offset = std::min<size_t>(offset + 1, std::max<int>(0, filtered.size() - height + config.y_offset));

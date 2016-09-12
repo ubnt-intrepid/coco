@@ -7,6 +7,7 @@
 #include <regex>
 #include <iostream>
 #include <stdexcept>
+#include <functional>
 #include <nanojson.hpp>
 #include <cmdline.h>
 using namespace std::literals::string_literals;
@@ -34,25 +35,6 @@ size_t get_utf8_char_length(uint8_t ch)
   }
 
   throw std::runtime_error(string(__FUNCTION__) + ": unreachable");
-}
-
-std::string get_utf8_char()
-{
-  std::array<uint8_t, 6> buf{0};
-
-  auto ch0 = static_cast<uint8_t>(::getch() & 0x000000FF);
-  size_t len = get_utf8_char_length(ch0);
-  buf[0] = ch0;
-
-  for (size_t i = 1; i < len; ++i) {
-    auto ch = static_cast<uint8_t>(::getch() & 0x000000FF);
-    if (!is_utf8_cont(ch)) {
-      throw std::runtime_error(string(__FUNCTION__) + ": wrong byte exists");
-    }
-    buf[i] = ch;
-  }
-
-  return std::string(buf.data(), buf.data() + len);
 }
 
 void pop_back_utf8(std::string& str)
@@ -85,49 +67,6 @@ public:
   inline bool operator==(Key key) const { return this->key == key; }
 };
 
-Event poll_event()
-{
-  int ch = ::getch();
-  if (ch == 10) {
-    return Event{Key::Enter};
-  }
-  else if (ch == 27) {
-    ::nodelay(stdscr, true);
-    int ch = ::getch();
-    if (ch == -1) {
-      ::nodelay(stdscr, false);
-      return Event{Key::Esc};
-    }
-    else {
-      ::nodelay(stdscr, false);
-      return Event{ch};
-    }
-  }
-  else if (ch == KEY_UP) {
-    return Event{Key::Up};
-  }
-  else if (ch == KEY_DOWN) {
-    return Event{Key::Down};
-  }
-  else if (ch == KEY_LEFT) {
-    return Event{Key::Left};
-  }
-  else if (ch == KEY_RIGHT) {
-    return Event{Key::Right};
-  }
-  else if (ch == 127) {
-    return Event{Key::Backspace};
-  }
-  else if (is_utf8_first(ch & 0xFF)) {
-    ::ungetch(ch);
-    auto ch = get_utf8_char();
-    return Event{std::move(ch)};
-  }
-  else {
-    return Event{Key::Unknown};
-  }
-}
-
 // wrapper of Ncurses API.
 class Ncurses {
 public:
@@ -143,7 +82,91 @@ public:
     ::init_pair(1, COLOR_WHITE, COLOR_BLACK);
     ::init_pair(2, COLOR_RED, COLOR_WHITE);
   }
+
   ~Ncurses() { ::endwin(); }
+
+  void erase() { ::werase(stdscr); }
+
+  void refresh() { ::wrefresh(stdscr); }
+
+  std::tuple<int, int> get_width_height() const
+  {
+    int width, height;
+    getmaxyx(stdscr, height, width);
+    return std::make_tuple(width, height);
+  }
+
+  void add_string(int x, int y, std::string const& text) { mvwaddstr(stdscr, y, x, text.c_str()); }
+
+  void change_attr(int x, int y, int n, int col)
+  {
+    attrset(COLOR_PAIR(col));
+    mvwchgat(stdscr, y, x, n, A_NORMAL, col, nullptr);
+    attrset(COLOR_PAIR(1));
+  }
+
+  Event poll_event()
+  {
+    int ch = ::getch();
+    if (ch == 10) {
+      return Event{Key::Enter};
+    }
+    else if (ch == 27) {
+      ::nodelay(stdscr, true);
+      int ch = ::getch();
+      if (ch == -1) {
+        ::nodelay(stdscr, false);
+        return Event{Key::Esc};
+      }
+      else {
+        ::nodelay(stdscr, false);
+        return Event{ch};
+      }
+    }
+    else if (ch == KEY_UP) {
+      return Event{Key::Up};
+    }
+    else if (ch == KEY_DOWN) {
+      return Event{Key::Down};
+    }
+    else if (ch == KEY_LEFT) {
+      return Event{Key::Left};
+    }
+    else if (ch == KEY_RIGHT) {
+      return Event{Key::Right};
+    }
+    else if (ch == 127) {
+      return Event{Key::Backspace};
+    }
+    else if (is_utf8_first(ch & 0xFF)) {
+      ::ungetch(ch);
+      auto ch = get_utf8_char();
+      return Event{std::move(ch)};
+    }
+    else {
+      return Event{Key::Unknown};
+    }
+  }
+
+private:
+  std::string get_utf8_char()
+  {
+    std::array<uint8_t, 6> buf{0};
+
+    auto ch0 = static_cast<uint8_t>(::getch() & 0x000000FF);
+    size_t len = get_utf8_char_length(ch0);
+    buf[0] = ch0;
+
+    for (size_t i = 1; i < len; ++i) {
+      auto ch = static_cast<uint8_t>(::getch() & 0x000000FF);
+      if (!is_utf8_cont(ch)) {
+        throw std::runtime_error(string(__FUNCTION__) + ": wrong byte exists");
+      }
+      buf[i] = ch;
+    }
+
+    return std::string(buf.data(), buf.data() + len);
+  }
 };
 
 struct Config {
@@ -151,7 +174,8 @@ struct Config {
   size_t y_offset;
 
 public:
-  void read_from(int argc, char const** argv) {
+  void read_from(int argc, char const** argv)
+  {
     static_cast<void>(argc);
     static_cast<void>(argv);
   }
@@ -176,130 +200,119 @@ class Coco {
 public:
   Coco(Config const& config, std::vector<std::string> const& lines) : config(config), lines(lines), filtered(lines) {}
 
-  std::tuple<bool, std::string> select_line(Ncurses ncurses);
+  std::tuple<bool, std::string> select_line(Ncurses term)
+  {
+    render_screen(term);
+
+    while (true) {
+      Event ev = term.poll_event();
+      auto result = handle_key_event(term, ev);
+
+      if (result == Status::Selected) {
+        return std::make_tuple(true, filtered[cursor]);
+      }
+      else if (result == Status::Escaped) {
+        break;
+      }
+
+      render_screen(term);
+    }
+
+    return std::make_tuple(false, ""s);
+  }
 
 private:
-  void render_screen();
-  Status handle_key_event(Event const& ev);
-  void update_filter_list();
-  std::vector<std::string> filter_by_regex(std::vector<std::string> const& lines) const;
-};
+  void render_screen(Ncurses& term)
+  {
+    std::string query_str = config.prompt + query;
 
-void Coco::render_screen()
-{
-  std::string query_str = config.prompt + query;
+    term.erase();
 
-  ::werase(stdscr);
+    int width;
+    std::tie(width, std::ignore) = term.get_width_height();
 
-  int width, height;
-  getmaxyx(stdscr, height, width);
-  static_cast<void>(height);
-
-  for (size_t y = 0; y < std::min<size_t>(filtered.size() - offset, width - 1); ++y) {
-    mvwaddstr(stdscr, y + 1, 0, filtered[y + offset].c_str());
-    if (y == cursor) {
-      attrset(COLOR_PAIR(2));
-      mvwchgat(stdscr, y + 1, 0, -1, A_NORMAL, 2, nullptr);
-      attrset(COLOR_PAIR(1));
-    }
-  }
-
-  mvwaddstr(stdscr, 0, 0, query_str.c_str());
-
-  ::wrefresh(stdscr);
-}
-
-auto Coco::handle_key_event(Event const& ev) -> Status
-{
-  if (ev == Key::Enter) {
-    return filtered.size() > 0 ? Status::Selected : Status::Escaped;
-  }
-  else if (ev == Key::Esc) {
-    return Status::Escaped;
-  }
-  else if (ev == Key::Up) {
-    if (cursor == 0) {
-      offset = std::max(0, (int)offset - 1);
-    }
-    else {
-      cursor--;
-    }
-    return Status::Continue;
-  }
-  else if (ev == Key::Down) {
-    int width, height;
-    getmaxyx(stdscr, height, width);
-
-    if (cursor == static_cast<size_t>(height - 1 - config.y_offset)) {
-      offset = std::min<size_t>(offset + 1, std::max<int>(0, filtered.size() - height + config.y_offset));
-    }
-    else {
-      cursor = std::min<size_t>(cursor + 1, std::min<size_t>(filtered.size() - offset, height - config.y_offset) - 1);
-    }
-    return Status::Continue;
-  }
-  else if (ev == Key::Backspace) {
-    if (!query.empty()) {
-      pop_back_utf8(query);
-      update_filter_list();
-    }
-    return Status::Continue;
-  }
-  else if (ev == Key::Char) {
-    query += ev.as_chars();
-    update_filter_list();
-    return Status::Continue;
-  }
-  else {
-    return Status::Continue;
-  }
-}
-
-std::tuple<bool, std::string> Coco::select_line(Ncurses ncurses)
-{
-  static_cast<void>(ncurses);
-
-  render_screen();
-
-  while (true) {
-    Event ev = poll_event();
-
-    auto result = handle_key_event(ev);
-    if (result == Status::Selected) {
-      return std::make_tuple(true, filtered[cursor]);
-    }
-    else if (result == Status::Escaped) {
-      break;
-    }
-    render_screen();
-  }
-
-  return std::make_tuple(false, ""s);
-}
-
-void Coco::update_filter_list()
-{
-  filtered = filter_by_regex(lines);
-  cursor = 0;
-  offset = 0;
-}
-
-std::vector<std::string> Coco::filter_by_regex(std::vector<std::string> const& lines) const
-{
-  if (query.empty()) {
-    return lines;
-  }
-  else {
-    std::regex re(query);
-    std::vector<std::string> filtered;
-    for (auto&& line : lines) {
-      if (std::regex_search(line, re)) {
-        filtered.push_back(line);
+    for (size_t y = 0; y < std::min<size_t>(filtered.size() - offset, width - 1); ++y) {
+      term.add_string(0, y + 1, filtered[y + offset]);
+      if (y == cursor) {
+        term.change_attr(0, y + 1, -1, 2);
       }
     }
-    return filtered;
+
+    term.add_string(0, 0, query_str);
+
+    term.refresh();
   }
-}
+
+  Status handle_key_event(Ncurses& term, Event const& ev)
+  {
+    if (ev == Key::Enter) {
+      return filtered.size() > 0 ? Status::Selected : Status::Escaped;
+    }
+    else if (ev == Key::Esc) {
+      return Status::Escaped;
+    }
+    else if (ev == Key::Up) {
+      if (cursor == 0) {
+        offset = std::max(0, (int)offset - 1);
+      }
+      else {
+        cursor--;
+      }
+      return Status::Continue;
+    }
+    else if (ev == Key::Down) {
+      int height;
+      std::tie(std::ignore, height) = term.get_width_height();
+
+      if (cursor == static_cast<size_t>(height - 1 - config.y_offset)) {
+        offset = std::min<size_t>(offset + 1, std::max<int>(0, filtered.size() - height + config.y_offset));
+      }
+      else {
+        cursor = std::min<size_t>(cursor + 1, std::min<size_t>(filtered.size() - offset, height - config.y_offset) - 1);
+      }
+      return Status::Continue;
+    }
+    else if (ev == Key::Backspace) {
+      if (!query.empty()) {
+        pop_back_utf8(query);
+        update_filter_list();
+      }
+      return Status::Continue;
+    }
+    else if (ev == Key::Char) {
+      query += ev.as_chars();
+      update_filter_list();
+      return Status::Continue;
+    }
+    else {
+      return Status::Continue;
+    }
+  }
+
+  void update_filter_list()
+  {
+    filtered = filter_by_regex(lines);
+    cursor = 0;
+    offset = 0;
+  }
+
+  std::vector<std::string> filter_by_regex(std::vector<std::string> const& lines) const
+  {
+    if (query.empty()) {
+      return lines;
+    }
+    else {
+      std::regex re(query);
+      std::vector<std::string> filtered;
+      for (auto&& line : lines) {
+        if (std::regex_search(line, re)) {
+          filtered.push_back(line);
+        }
+      }
+      return filtered;
+    }
+  }
+};
 
 int main(int argc, char const* argv[])
 {

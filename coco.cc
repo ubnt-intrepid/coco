@@ -7,6 +7,8 @@
 #include <regex>
 #include <iostream>
 #include <stdexcept>
+#include <nanojson.hpp>
+#include <cmdline.h>
 using namespace std::literals::string_literals;
 using std::string;
 using std::tuple;
@@ -58,7 +60,7 @@ void pop_back_utf8(std::string& str)
   if (str.empty())
     return;
 
-  for (size_t len = str.size() - 1; len >= 0; --len) {
+  for (ssize_t len = str.size() - 1; len >= 0; --len) {
     if (!is_utf8_cont(str[len])) {
       str.resize(len);
       return;
@@ -144,6 +146,17 @@ public:
   ~Ncurses() { ::endwin(); }
 };
 
+struct Config {
+  std::string prompt;
+  size_t y_offset;
+
+public:
+  void read_from(int argc, char const** argv) {
+    static_cast<void>(argc);
+    static_cast<void>(argv);
+  }
+};
+
 // represents a instance of Coco client.
 class Coco {
   enum class Status {
@@ -152,6 +165,8 @@ class Coco {
     Continue,
   };
 
+  Config config;
+
   std::vector<std::string> const& lines;
   std::vector<std::string> filtered;
   std::string query;
@@ -159,9 +174,9 @@ class Coco {
   size_t offset = 0;
 
 public:
-  Coco(std::vector<std::string> const& lines) : lines(lines), filtered(lines) {}
+  Coco(Config const& config, std::vector<std::string> const& lines) : config(config), lines(lines), filtered(lines) {}
 
-  std::tuple<bool, std::string> select_line(Ncurses&& ncurses);
+  std::tuple<bool, std::string> select_line(Ncurses ncurses);
 
 private:
   void render_screen();
@@ -172,12 +187,13 @@ private:
 
 void Coco::render_screen()
 {
-  std::string query_str = "QUERY> " + query;
+  std::string query_str = config.prompt + query;
 
   ::werase(stdscr);
 
   int width, height;
   getmaxyx(stdscr, height, width);
+  static_cast<void>(height);
 
   for (size_t y = 0; y < std::min<size_t>(filtered.size() - offset, width - 1); ++y) {
     mvwaddstr(stdscr, y + 1, 0, filtered[y + offset].c_str());
@@ -214,11 +230,11 @@ auto Coco::handle_key_event(Event const& ev) -> Status
     int width, height;
     getmaxyx(stdscr, height, width);
 
-    if (cursor == height - 2) {
-      offset = std::min<size_t>(offset + 1, std::max<int>(0, filtered.size() - height + 1));
+    if (cursor == static_cast<size_t>(height - 1 - config.y_offset)) {
+      offset = std::min<size_t>(offset + 1, std::max<int>(0, filtered.size() - height + config.y_offset));
     }
     else {
-      cursor = std::min<size_t>(cursor + 1, std::min<size_t>(filtered.size() - offset, height - 1) - 1);
+      cursor = std::min<size_t>(cursor + 1, std::min<size_t>(filtered.size() - offset, height - config.y_offset) - 1);
     }
     return Status::Continue;
   }
@@ -239,8 +255,10 @@ auto Coco::handle_key_event(Event const& ev) -> Status
   }
 }
 
-std::tuple<bool, std::string> Coco::select_line(Ncurses&& ncurses)
+std::tuple<bool, std::string> Coco::select_line(Ncurses ncurses)
 {
+  static_cast<void>(ncurses);
+
   render_screen();
 
   while (true) {
@@ -283,7 +301,7 @@ std::vector<std::string> Coco::filter_by_regex(std::vector<std::string> const& l
   }
 }
 
-int main()
+int main(int argc, char const* argv[])
 {
   std::setlocale(LC_ALL, "");
 
@@ -296,7 +314,12 @@ int main()
     }
 
     // Initialize Coco application.
-    Coco coco{lines};
+    Config config;
+    config.prompt = "QUERY> ";
+    config.y_offset = 1;
+    config.read_from(argc, argv);
+
+    Coco coco{config, lines};
 
     // reopen file handlers of TTY for Ncurses session.
     freopen("/dev/tty", "r", stdin);

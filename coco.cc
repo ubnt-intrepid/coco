@@ -2,6 +2,7 @@
 #include <functional>
 #include <iostream>
 #include <locale>
+#include <numeric>
 #include <regex>
 #include <stdexcept>
 #include <string>
@@ -81,7 +82,7 @@ class Coco {
 
   Config config;
 
-  std::vector<std::string> filtered;
+  std::vector<std::size_t> filtered;
   std::string query;
   size_t cursor = 0;
   size_t offset = 0;
@@ -89,7 +90,9 @@ class Coco {
 public:
   Coco(Config const& config) : config(config)
   {
-    filtered = config.lines;
+    filtered.resize(config.lines.size());
+    std::iota(filtered.begin(), filtered.end(), 0);
+
     query = config.query;
   }
 
@@ -104,7 +107,7 @@ public:
       auto result = handle_key_event(term, ev);
 
       if (result == Status::Selected) {
-        return Selection{true, filtered[cursor]};
+        return Selection{true, config.lines[filtered[cursor]]};
       }
       else if (result == Status::Escaped) {
         break;
@@ -127,7 +130,7 @@ private:
     std::tie(std::ignore, height) = term.get_size();
 
     for (size_t y = 0; y < std::min<size_t>(filtered.size() - offset, height - 1); ++y) {
-      term.add_str(0, y + 1, filtered[y + offset]);
+      term.add_str(0, y + 1, config.lines[filtered[y + offset]]);
       if (y == cursor) {
         term.change_attr(0, y + 1, -1, 2);
       }
@@ -186,25 +189,25 @@ private:
 
   void update_filter_list()
   {
-    filtered = filter_by_regex(config.lines);
+    filter_by_regex(filtered, config.lines);
     cursor = 0;
     offset = 0;
   }
 
-  std::vector<std::string> filter_by_regex(std::vector<std::string> const& lines) const
+  void filter_by_regex(std::vector<std::size_t>& filtered, std::vector<std::string> const& lines) const
   {
     if (query.empty()) {
-      return lines;
+      filtered.resize(lines.size());
+      std::iota(filtered.begin(), filtered.end(), 0);
     }
     else {
       std::regex re(query);
-      std::vector<std::string> filtered;
-      for (auto&& line : lines) {
-        if (std::regex_search(line, re)) {
-          filtered.push_back(line);
+      filtered.resize(0);
+      for (std::size_t i = 0; i < lines.size(); ++i) {
+        if (std::regex_search(lines[i], re)) {
+          filtered.push_back(i);
         }
       }
-      return filtered;
     }
   }
 };

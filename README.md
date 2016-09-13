@@ -1,17 +1,21 @@
 # coco
 
-## Overview
-`coco` is an alternative of fuzzy text selector written in C++14.
+![captured](cap.gif "captured")
 
-Unlike to other tools(`peco`, `fzf`, etc), `coco` can use directly on Cygwin/MSYS2's terminal emulator `mintty`.
+`coco` is an alternative of interactive text selector written in C++.
+This project is inspired from D language version of text selector [doco](https://github.com/alphaKAI/doco).
 
-The development of this project is inspired from [doco](https://github.com/alphaKAI/doco), dlang clone of peco.
+## Features 
+* available on `mintty`, Cygwin/MSYS2's default terminal emulator
 
 ## Requirements
-`coco` depends on `ncurses` for TTY access.  On MSYS2, The installation procedure of required packages is as follows:
+* `ncurses`  - for TTY access
+* `python`   - at build
+
+On MSYS2, The installation procedure of required packages is as follows:
 
 ```shell-session
-$ pacman -S --noconfirm gcc ncurses-devel python
+$ pacman -S --noconfirm gcc ncurses-devel python pkg-config
 ```
 
 ## Build & Installation
@@ -25,4 +29,4 @@ $ ./waf --prefix=/usr/local configure install
 ## License
 Copyright (c) 2016, Yusuke Sasaki
 
-This software is released under MIT License (see [LICENSE](LICENSE))
+This software is released under the MIT License (see [LICENSE](LICENSE))

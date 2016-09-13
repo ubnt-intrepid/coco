@@ -1,0 +1,10 @@
+[0m[01;34mbuild[0m/
+coco.cc
+[01;34mexternal[0m/
+LICENSE
+ncurses.hh
+README.md
+test.txt
+utf8.hh
+[32;4mwaf[0m*
+wscript

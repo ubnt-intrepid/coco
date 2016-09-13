@@ -16,7 +16,8 @@
 
 struct Config {
   std::vector<std::string> lines;
-  std::string prompt = "QUERY> ";
+  std::string prompt;
+  std::string query;
   size_t y_offset = 1;
 
 public:
@@ -25,11 +26,26 @@ public:
 
   void read_from(int argc, char const** argv)
   {
-    static_cast<void>(argc);
-    static_cast<void>(argv);
+    cmdline::parser parser;
+    parser.set_program_name("coco");
+    parser.add("help", 'h', "show this message and quit");
+    parser.add<std::string>("query", 0, "initial value for query", false, "");
+    parser.add<std::string>("prompt", 0, "specify the prompt string", false, "QUERY> ");
+    parser.footer("filename...");
+    parser.parse_check(argc, argv);
 
-    std::ifstream ifs;
-    read_lines((argc > 1) ? (ifs.open(argv[1]), ifs) : std::cin);
+    query = parser.get<std::string>("query");
+    prompt = parser.get<std::string>("prompt");
+
+    if (parser.rest().size() > 0) {
+      for (auto&& path : parser.rest()) {
+        std::ifstream ifs{path};
+        read_lines(ifs);
+      }
+    }
+    else {
+      read_lines(std::cin);
+    }
   }
 
   void read_lines(std::istream& is)
@@ -66,7 +82,11 @@ class Coco {
   size_t offset = 0;
 
 public:
-  Coco(Config const& config) : config(config) { filtered = config.lines; }
+  Coco(Config const& config) : config(config)
+  {
+    filtered = config.lines;
+    query = config.query;
+  }
 
   Selection select_line()
   {

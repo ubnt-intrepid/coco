@@ -33,7 +33,7 @@ class Ncurses {
 
   std::unique_ptr<FILE, deleter_t> tty_in, tty_out;
   SCREEN* screen;
-  SCREEN* screen_orig; 
+  SCREEN* screen_orig;
 
 public:
   Ncurses()
@@ -46,7 +46,7 @@ public:
     // switch to the current screen.
     screen_orig = ::set_term(screen);
 
-    // setup 
+    // setup
     ::noecho();             // do not echo back characters
     ::cbreak();             // without buffering
     ::keypad(stdscr, true); // convert escape sequeces to key code
@@ -60,15 +60,16 @@ public:
 
   Ncurses(Ncurses&&) noexcept = default;
 
-  ~Ncurses() {
-      // reset current screen.
-     ::endwin();
+  ~Ncurses()
+  {
+    // reset current screen.
+    ::endwin();
 
-     // switch to original screen. 
-     ::set_term(screen_orig);
+    // switch to original screen.
+    ::set_term(screen_orig);
 
-     // release all resources of current session.
-     ::delscreen(screen);
+    // release all resources of current session.
+    ::delscreen(screen);
   }
 
   void erase() { ::werase(stdscr); }

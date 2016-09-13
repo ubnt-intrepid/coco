@@ -1,4 +1,3 @@
-#include <cstdio>
 #include <fstream>
 #include <functional>
 #include <iostream>
@@ -14,11 +13,12 @@
 #include "ncurses.hh"
 #include "utf8.hh"
 
+constexpr size_t y_offset = 1;
+
 struct Config {
   std::vector<std::string> lines;
   std::string prompt;
   std::string query;
-  size_t y_offset = 1;
 
 public:
   Config() = default;
@@ -31,28 +31,33 @@ public:
     parser.add("help", 'h', "show this message and quit");
     parser.add<std::string>("query", 0, "initial value for query", false, "");
     parser.add<std::string>("prompt", 0, "specify the prompt string", false, "QUERY> ");
+    parser.add<std::size_t>("max-buffer", 'b', "maximum length of lines", false, 4096);
     parser.footer("filename...");
     parser.parse_check(argc, argv);
 
     query = parser.get<std::string>("query");
     prompt = parser.get<std::string>("prompt");
+    auto max_len = parser.get<std::size_t>("max-buffer");
 
+    lines.resize(0);
+    lines.reserve(max_len);
     if (parser.rest().size() > 0) {
       for (auto&& path : parser.rest()) {
         std::ifstream ifs{path};
-        read_lines(ifs);
+        read_lines(ifs, max_len);
       }
     }
     else {
-      read_lines(std::cin);
+      read_lines(std::cin, max_len);
     }
   }
 
-  void read_lines(std::istream& is)
+  void read_lines(std::istream& is, std::size_t max_len)
   {
-    lines.resize(0);
-    std::regex ansi(R"(\x1B\[([0-9]{1,2}(;[0-9]{1,2})?)?[m|K])");
+    static std::regex ansi(R"(\x1B\[([0-9]{1,2}(;[0-9]{1,2})?)?[m|K])");
     for (std::string line; std::getline(is, line);) {
+      if (lines.size() == max_len)
+        return;
       lines.push_back(std::regex_replace(line, ansi, ""));
     }
   }
@@ -154,11 +159,11 @@ private:
       int height;
       std::tie(std::ignore, height) = term.get_size();
 
-      if (cursor == static_cast<size_t>(height - 1 - config.y_offset)) {
-        offset = std::min<size_t>(offset + 1, std::max<int>(0, filtered.size() - height + config.y_offset));
+      if (cursor == static_cast<size_t>(height - 1 - y_offset)) {
+        offset = std::min<size_t>(offset + 1, std::max<int>(0, filtered.size() - height + y_offset));
       }
       else {
-        cursor = std::min<size_t>(cursor + 1, std::min<size_t>(filtered.size() - offset, height - config.y_offset) - 1);
+        cursor = std::min<size_t>(cursor + 1, std::min<size_t>(filtered.size() - offset, height - y_offset) - 1);
       }
       return Status::Continue;
     }

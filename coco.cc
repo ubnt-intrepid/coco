@@ -90,10 +90,8 @@ class Coco {
 public:
   Coco(Config const& config) : config(config)
   {
-    filtered.resize(config.lines.size());
-    std::iota(filtered.begin(), filtered.end(), 0);
-
     query = config.query;
+    update_filter_list();
   }
 
   Selection select_line()

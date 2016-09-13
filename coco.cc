@@ -105,7 +105,7 @@ public:
       auto result = handle_key_event(term, ev);
 
       if (result == Status::Selected) {
-        return Selection{true, config.lines[filtered[cursor]]};
+        return Selection{true, config.lines[filtered[cursor + offset]]};
       }
       else if (result == Status::Escaped) {
         break;

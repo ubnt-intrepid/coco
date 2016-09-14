@@ -8,7 +8,7 @@
 #include <stdexcept>
 #include "utf8.hh"
 
-enum class Key { Enter, Esc, Alt, Up, Down, Left, Right, Backspace, Char, Unknown };
+enum class Key { Enter, Esc, Alt, Up, Down, Left, Right, Tab, Backspace, Char, Unknown };
 
 class Event {
   Key key;
@@ -121,6 +121,9 @@ public:
     }
     else if (ch == KEY_RIGHT) {
       return Event{Key::Right};
+    }
+    else if (ch == 9) {
+      return Event{Key::Tab};
     }
     else if (ch == 127) {
       return Event{Key::Backspace};

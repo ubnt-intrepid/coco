@@ -17,7 +17,15 @@
 #include "ncurses.hh"
 #include "utf8.hh"
 
+
+enum class Coco::Status {
+  Selected,
+  Escaped,
+  Continue,
+};
+
 constexpr size_t y_offset = 1;
+
 
 void Config::read_from(int argc, char const** argv)
 {
@@ -59,6 +67,7 @@ void Config::read_lines(std::istream& is, std::size_t max_len)
     lines.push_back(std::regex_replace(line, ansi, ""));
   }
 }
+
 
 Coco::Coco(Config const& config) : config(config)
 {

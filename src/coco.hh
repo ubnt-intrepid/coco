@@ -38,11 +38,7 @@ public:
 class Ncurses;
 class Event;
 class Coco {
-  enum class Status {
-    Selected,
-    Escaped,
-    Continue,
-  };
+  enum class Status;
 
   Config config;
   std::string query;

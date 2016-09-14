@@ -85,10 +85,10 @@ public:
 
   void add_str(int x, int y, std::string const& text) { mvwaddstr(stdscr, y, x, text.c_str()); }
 
-  void change_attr(int x, int y, int n, int col)
+  void change_attr(int x, int y, int n, int col, int attr = A_NORMAL)
   {
     attrset(COLOR_PAIR(col));
-    mvwchgat(stdscr, y, x, n, A_NORMAL, col, nullptr);
+    mvwchgat(stdscr, y, x, n, attr, col, nullptr);
     attrset(COLOR_PAIR(1));
   }
 

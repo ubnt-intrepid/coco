@@ -91,8 +91,8 @@ class Coco {
 
   std::vector<std::size_t> filtered;
   std::string query;
-  size_t cursor = 0;
-  size_t offset = 0;
+  std::size_t cursor = 0;
+  std::size_t offset = 0;
 
 public:
   Coco(Config const& config) : config(config)
@@ -135,11 +135,13 @@ private:
     std::tie(std::ignore, height) = term.get_size();
 
     for (size_t y = 0; y < std::min<size_t>(filtered.size() - offset, height - 1); ++y) {
-      term.add_str(0, y + 1, config.lines[filtered[y + offset]]);
+      term.add_str(2, y + 1, config.lines[filtered[y + offset]]);
       if (y == cursor) {
-        term.change_attr(0, y + 1, -1, 2);
+        term.change_attr(0, y + 1, -1, 0, A_BOLD | A_UNDERLINE);
       }
     }
+
+    term.add_str(0, cursor + y_offset, ">");
 
     term.add_str(0, 0, query_str);
 

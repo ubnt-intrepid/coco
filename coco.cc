@@ -24,6 +24,7 @@ struct Config {
   std::string query;
   std::size_t score_max;
   std::size_t max_buffer;
+  bool  multi_select;
 
 public:
   Config() = default;
@@ -33,12 +34,12 @@ public:
   {
     cmdline::parser parser;
     parser.set_program_name("coco");
-    parser.add("help", 'h', "show this message and quit");
-    parser.add<std::string>("query", 0, "initial value for query", false, "");
+   parser.add<std::string>("query", 0, "initial value for query", false, "");
     parser.add<std::string>("prompt", 0, "specify the prompt string", false, "QUERY> ");
     parser.add<std::size_t>("max-buffer", 'b', "maximum length of lines", false, 4096);
     parser.add<std::size_t>("score-max", 's', "maximum of scorering number", false,
                             std::numeric_limits<std::size_t>::max() / 2);
+                        parser.add("multi-select", 'm', "enable multiple selection of lines");
     parser.footer("filename...");
     parser.parse_check(argc, argv);
 
@@ -46,6 +47,7 @@ public:
     prompt = parser.get<std::string>("prompt");
     score_max = parser.get<std::size_t>("score-max");
     max_buffer = parser.get<std::size_t>("max-buffer");
+    multi_select = parser.exist("multi-select");
 
     lines.resize(0);
     lines.reserve(max_buffer);
@@ -173,11 +175,17 @@ private:
       return Status::Escaped;
     }
     else if (ev == Key::Up) {
+      if (!config.multi_select) {
+        choices[cursor + offset].selected = false;
+      }
       if (cursor == 0) {
         offset = std::max(0, (int)offset - 1);
       }
       else {
         cursor--;
+      }
+      if (!config.multi_select) {
+        choices[cursor + offset].selected = true;
       }
       return Status::Continue;
     }
@@ -185,16 +193,26 @@ private:
       int height;
       std::tie(std::ignore, height) = term.get_size();
 
+      if (!config.multi_select) {
+        choices[cursor + offset].selected = false;
+      }
+
       if (cursor == static_cast<size_t>(height - 1 - y_offset)) {
         offset = std::min<size_t>(offset + 1, std::max<int>(0, filtered_len - height + y_offset));
       }
       else {
         cursor = std::min<size_t>(cursor + 1, std::min<size_t>(filtered_len - offset, height - y_offset) - 1);
       }
+
+      if (!config.multi_select) {
+        choices[cursor + offset].selected = true;
+      }
       return Status::Continue;
     }
     else if (ev == Key::Tab) {
+      if (config.multi_select) {
       choices[cursor + offset].selected ^= true;
+      }
       return Status::Continue;
     }
     else if (ev == Key::Backspace) {
@@ -234,6 +252,10 @@ private:
 
     cursor = 0;
     offset = 0;
+    if (!config.multi_select) {
+      for (auto& choice:choices) { choice.selected = false;}
+      choices[0].selected = true;
+    }
   }
 
   template <typename Scorer>

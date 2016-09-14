@@ -73,9 +73,12 @@ public:
 
 struct Selection {
   bool is_selected = false;
-  std::string line;
+  std::vector<std::string> lines;
 
 public:
+  Selection() = default;
+  Selection(std::vector<std::string> lines) : lines{std::move(lines)} {}
+
   inline operator bool() const { return is_selected; }
 };
 
@@ -88,9 +91,12 @@ class Coco {
   };
 
   Config config;
-
-  std::vector<std::size_t> filtered;
   std::string query;
+
+  std::vector<std::size_t> scores;
+  std::vector<bool> selected;
+  std::size_t filtered_len = 0;
+
   std::size_t cursor = 0;
   std::size_t offset = 0;
 
@@ -112,7 +118,13 @@ public:
       auto result = handle_key_event(term, ev);
 
       if (result == Status::Selected) {
-        return Selection{true, config.lines[filtered[cursor + offset]]};
+        // FIXME: remove dummy.
+        std::vector<std::string> lines;
+        for (std::size_t i = 0; i < selected.size(); ++i) {
+          if (selected[i])
+            lines.push_back(config.lines[i]);
+        }
+        return Selection{lines};
       }
       else if (result == Status::Escaped) {
         break;
@@ -134,14 +146,16 @@ private:
     int height;
     std::tie(std::ignore, height) = term.get_size();
 
-    for (size_t y = 0; y < std::min<size_t>(filtered.size() - offset, height - 1); ++y) {
-      term.add_str(2, y + 1, config.lines[filtered[y + offset]]);
+    for (size_t y = 0; y < std::min<size_t>(filtered_len - offset, height - 1); ++y) {
+      if (selected[y + offset]) {
+        term.add_str(0, y + y_offset, ">");
+      }
+      term.add_str(2, y + 1, config.lines[y + offset]);
+
       if (y == cursor) {
         term.change_attr(0, y + 1, -1, 0, A_BOLD | A_UNDERLINE);
       }
     }
-
-    term.add_str(0, cursor + y_offset, ">");
 
     term.add_str(0, 0, query_str);
 
@@ -151,7 +165,7 @@ private:
   Status handle_key_event(Ncurses& term, Event const& ev)
   {
     if (ev == Key::Enter) {
-      return filtered.size() > 0 ? Status::Selected : Status::Escaped;
+      return Status::Selected;
     }
     else if (ev == Key::Esc) {
       return Status::Escaped;
@@ -170,10 +184,10 @@ private:
       std::tie(std::ignore, height) = term.get_size();
 
       if (cursor == static_cast<size_t>(height - 1 - y_offset)) {
-        offset = std::min<size_t>(offset + 1, std::max<int>(0, filtered.size() - height + y_offset));
+        offset = std::min<size_t>(offset + 1, std::max<int>(0, filtered_len - height + y_offset));
       }
       else {
-        cursor = std::min<size_t>(cursor + 1, std::min<size_t>(filtered.size() - offset, height - y_offset) - 1);
+        cursor = std::min<size_t>(cursor + 1, std::min<size_t>(filtered_len - offset, height - y_offset) - 1);
       }
       return Status::Continue;
     }
@@ -205,13 +219,10 @@ private:
 
   void update_filter_list()
   {
-    // reset filtered list.
-    filtered.resize(config.lines.size());
-    std::iota(filtered.begin(), filtered.end(), 0);
-
+    scores.resize(config.lines.size());
     try {
       auto&& score = regex_score();
-      choice(filtered, config.lines, std::move(score), config.score_max);
+      filtered_len = scoring(config.lines, std::move(score), config.score_max);
     }
     catch (std::regex_error&) {
     }
@@ -221,17 +232,17 @@ private:
   }
 
   template <typename Scorer>
-  void choice(std::vector<std::size_t>& filtered, std::vector<std::string> const& lines, Scorer score,
-              std::size_t score_max) const
+  std::size_t scoring(std::vector<std::string> const& lines, Scorer score, std::size_t score_max)
   {
-    if (!query.empty()) {
-      auto pos = std::stable_partition(filtered.begin(), filtered.end(), [
-        score = std::move(score), score_max, lines = static_cast<std::vector<std::string> const&>(lines)
-      ](std::size_t idx) { return score(lines[idx]) <= score_max; });
-      if (pos < filtered.end()) {
-        filtered.resize(pos - filtered.begin());
-      }
+    if (query.empty()) {
+      return lines.size();
     }
+
+    std::transform(lines.begin(), lines.end(), scores.begin(), score);
+    std::stable_sort(scores.begin(), scores.end());
+
+    return std::find_if(scores.begin(), scores.end(), [score_max](std::size_t score) { return score > score_max; }) -
+           scores.begin();
   }
 };
 
@@ -249,7 +260,8 @@ int main(int argc, char const* argv[])
 
     // show selected line.
     if (selection) {
-      std::cout << selection.line << std::endl;
+      for (auto&& line : selection.lines)
+        std::cout << line << std::endl;
     }
 
     return 0;

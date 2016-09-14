@@ -77,7 +77,7 @@ struct Selection {
 
 public:
   Selection() = default;
-  Selection(std::vector<std::string> lines) : lines{std::move(lines)} {}
+  Selection(std::vector<std::string> lines) : is_selected{true}, lines{std::move(lines)} {}
 
   inline operator bool() const { return is_selected; }
 };
@@ -201,6 +201,10 @@ private:
       else {
         cursor = std::min<size_t>(cursor + 1, std::min<size_t>(filtered_len - offset, height - y_offset) - 1);
       }
+      return Status::Continue;
+    }
+    else if (ev == Key::Tab) {
+      choices[cursor + offset].selected ^= true;
       return Status::Continue;
     }
     else if (ev == Key::Backspace) {

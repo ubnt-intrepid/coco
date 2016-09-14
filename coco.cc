@@ -24,7 +24,7 @@ struct Config {
   std::string query;
   std::size_t score_max;
   std::size_t max_buffer;
-  bool  multi_select;
+  bool multi_select;
 
 public:
   Config() = default;
@@ -34,12 +34,12 @@ public:
   {
     cmdline::parser parser;
     parser.set_program_name("coco");
-   parser.add<std::string>("query", 0, "initial value for query", false, "");
+    parser.add<std::string>("query", 0, "initial value for query", false, "");
     parser.add<std::string>("prompt", 0, "specify the prompt string", false, "QUERY> ");
     parser.add<std::size_t>("max-buffer", 'b', "maximum length of lines", false, 4096);
     parser.add<std::size_t>("score-max", 's', "maximum of scorering number", false,
                             std::numeric_limits<std::size_t>::max() / 2);
-                        parser.add("multi-select", 'm', "enable multiple selection of lines");
+    parser.add("multi-select", 'm', "enable multiple selection of lines");
     parser.footer("filename...");
     parser.parse_check(argc, argv);
 
@@ -73,7 +73,6 @@ public:
   }
 };
 
-
 // represents a instance of Coco client.
 class Coco {
   enum class Status {
@@ -86,11 +85,12 @@ class Coco {
     std::size_t index;
     std::size_t score = 0;
     bool selected = false;
+
   public:
     Choice() = default;
-    Choice(std::size_t index): index(index) {}
+    Choice(std::size_t index) : index(index) {}
 
-    bool operator<(Choice const& rhs) const { return score < rhs.score ;}
+    bool operator<(Choice const& rhs) const { return score < rhs.score; }
   };
 
   Config config;
@@ -106,10 +106,10 @@ public:
   Coco(Config const& config) : config(config)
   {
     query = config.query;
-    
+
     choices.resize(config.lines.size());
-    std::generate(choices.begin(), choices.end(), [n=0] () mutable { return Choice(n++); });
-    update_filter_list(); 
+    std::generate(choices.begin(), choices.end(), [n = 0]() mutable { return Choice(n++); });
+    update_filter_list();
   }
 
   std::vector<std::string> select_line()
@@ -211,7 +211,7 @@ private:
     }
     else if (ev == Key::Tab) {
       if (config.multi_select) {
-      choices[cursor + offset].selected ^= true;
+        choices[cursor + offset].selected ^= true;
       }
       return Status::Continue;
     }
@@ -253,7 +253,9 @@ private:
     cursor = 0;
     offset = 0;
     if (!config.multi_select) {
-      for (auto& choice:choices) { choice.selected = false;}
+      for (auto& choice : choices) {
+        choice.selected = false;
+      }
       choices[0].selected = true;
     }
   }
@@ -265,10 +267,13 @@ private:
       return lines.size();
     }
 
-    for ( auto& choice: choices) { choice.score = score(lines[choice.index]); }
+    for (auto& choice : choices) {
+      choice.score = score(lines[choice.index]);
+    }
     std::stable_sort(choices.begin(), choices.end());
 
-    return std::find_if(choices.begin(), choices.end(), [score_max](auto& choice) { return choice.score > score_max; }) -
+    return std::find_if(choices.begin(), choices.end(),
+                        [score_max](auto& choice) { return choice.score > score_max; }) -
            choices.begin();
   }
 };
@@ -287,7 +292,7 @@ int main(int argc, char const* argv[])
 
     // show selected line.
     for (auto&& line : selected_lines)
-        std::cout << line << std::endl;
+      std::cout << line << std::endl;
 
     return 0;
   }

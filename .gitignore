@@ -6,3 +6,5 @@ waf3-*/
 build/
 .lock-waf*
 
+.waf_unittest_gmock/
+__pycache__/

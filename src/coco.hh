@@ -13,6 +13,7 @@ struct Config {
   double score_min;
   std::size_t max_buffer;
   bool multi_select;
+  std::string filter;
 
 public:
   Config() = default;
@@ -34,6 +35,8 @@ public:
   bool operator>(Choice const& rhs) const { return score > rhs.score; }
 };
 
+enum class FilterMode;
+
 // represents a instance of Coco client.
 class Ncurses;
 class Event;
@@ -48,6 +51,8 @@ class Coco {
 
   std::size_t cursor = 0;
   std::size_t offset = 0;
+
+  FilterMode filter_mode;
 
 public:
   Coco(Config const& config);

@@ -17,15 +17,33 @@
 #include "ncurses.hh"
 #include "utf8.hh"
 
-
 enum class Coco::Status {
   Selected,
   Escaped,
   Continue,
 };
 
-constexpr size_t y_offset = 1;
+enum class FilterMode {
+  CaseSensitive,
+  SmartCase,
+  Regex,
+};
 
+std::ostream& operator<<(std::ostream& os, FilterMode mode)
+{
+  switch (mode) {
+  case FilterMode::CaseSensitive:
+    return os << "CaseSensitive";
+  case FilterMode::SmartCase:
+    return os << "SmartCase";
+  case FilterMode::Regex:
+    return os << "Regex";
+  default:
+    throw std::logic_error(std::string(__FUNCTION__) + ": bad enum");
+  }
+}
+
+constexpr size_t y_offset = 1;
 
 void Config::read_from(int argc, char const** argv)
 {
@@ -35,6 +53,8 @@ void Config::read_from(int argc, char const** argv)
   parser.add<std::string>("prompt", 0, "specify the prompt string", false, "QUERY> ");
   parser.add<std::size_t>("max-buffer", 'b', "maximum length of lines", false, 4096);
   parser.add<double>("score-min", 's', "threshold of score", false, 0.01);
+  parser.add<std::string>("filter", 'f', "type of filter", false, "smart-case",
+                          cmdline::oneof<std::string>("case-sensitive", "smart-case", "regex"));
   parser.add("multi-select", 'm', "enable multiple selection of lines");
   parser.footer("filename...");
   parser.parse_check(argc, argv);
@@ -44,6 +64,7 @@ void Config::read_from(int argc, char const** argv)
   score_min = parser.get<double>("score-min");
   max_buffer = parser.get<std::size_t>("max-buffer");
   multi_select = parser.exist("multi-select");
+  filter = parser.get<std::string>("filter");
 
   lines.resize(0);
   lines.reserve(max_buffer);
@@ -68,10 +89,22 @@ void Config::read_lines(std::istream& is, std::size_t max_len)
   }
 }
 
-
 Coco::Coco(Config const& config) : config(config)
 {
   query = config.query;
+
+  if (config.filter == "case-sensitive") {
+    filter_mode = FilterMode::CaseSensitive;
+  }
+  else if (config.filter == "smart-case") {
+    filter_mode = FilterMode::SmartCase;
+  }
+  else if (config.filter == "regex") {
+    filter_mode = FilterMode::Regex;
+  }
+  else {
+    throw std::logic_error(std::string(__FUNCTION__) + ": bad option");
+  }
 
   choices.resize(config.lines.size());
   std::generate(choices.begin(), choices.end(), [n = 0]() mutable { return Choice(n++); });
@@ -108,12 +141,10 @@ std::vector<std::string> Coco::select_line()
 
 void Coco::render_screen(Ncurses& term)
 {
-  std::string query_str = config.prompt + query;
-
   term.erase();
 
-  int height;
-  std::tie(std::ignore, height) = term.get_size();
+  int width, height;
+  std::tie(width, height) = term.get_size();
 
   for (size_t y = 0; y < std::min<size_t>(filtered_len - offset, height - 1); ++y) {
     if (choices[y + offset].selected) {
@@ -126,6 +157,13 @@ void Coco::render_screen(Ncurses& term)
     }
   }
 
+  std::string query_str = config.prompt + query;
+
+  std::stringstream ss;
+  ss << filter_mode;
+  std::string mode_str = ss.str();
+
+  term.add_str(width - 1 - mode_str.length(), 0, mode_str);
   term.add_str(0, 0, query_str);
 
   term.refresh();
@@ -200,8 +238,15 @@ auto Coco::handle_key_event(Ncurses& term, Event const& ev) -> Status
 void Coco::update_filter_list()
 {
   try {
-    scoring(config.lines, score_by_regex(query));
-
+    if (filter_mode == FilterMode::CaseSensitive) {
+      scoring(config.lines, score_case_sensitive(query));
+    }
+    else if (filter_mode == FilterMode::SmartCase) {
+      scoring(config.lines, score_smart_case(query));
+    }
+    else if (filter_mode == FilterMode::Regex) {
+      scoring(config.lines, score_by_regex(query));
+    }
     filtered_len = std::find_if(choices.begin(), choices.end(),
                                 [this](auto& choice) { return choice.score <= config.score_min; }) -
                    choices.begin();

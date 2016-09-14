@@ -203,7 +203,17 @@ private:
 
   void update_filter_list()
   {
-    choice(filtered, config.lines, regex_score(), config.score_max);
+    // reset filtered list.
+    filtered.resize(config.lines.size());
+    std::iota(filtered.begin(), filtered.end(), 0);
+
+    try {
+      auto&& score = regex_score();
+      choice(filtered, config.lines, std::move(score), config.score_max);
+    }
+    catch (std::regex_error&) {
+    }
+
     cursor = 0;
     offset = 0;
   }
@@ -212,9 +222,6 @@ private:
   void choice(std::vector<std::size_t>& filtered, std::vector<std::string> const& lines, Scorer score,
               std::size_t score_max) const
   {
-    filtered.resize(lines.size());
-    std::iota(filtered.begin(), filtered.end(), 0);
-
     if (!query.empty()) {
       auto pos = std::stable_partition(filtered.begin(), filtered.end(), [
         score = std::move(score), score_max, lines = static_cast<std::vector<std::string> const&>(lines)

@@ -23,7 +23,7 @@ struct Config {
   std::vector<std::string> lines;
   std::string prompt;
   std::string query;
-  std::size_t score_max;
+  double score_min;
   std::size_t max_buffer;
   bool multi_select;
 
@@ -38,15 +38,14 @@ public:
     parser.add<std::string>("query", 0, "initial value for query", false, "");
     parser.add<std::string>("prompt", 0, "specify the prompt string", false, "QUERY> ");
     parser.add<std::size_t>("max-buffer", 'b', "maximum length of lines", false, 4096);
-    parser.add<std::size_t>("score-max", 's', "maximum of scorering number", false,
-                            std::numeric_limits<std::size_t>::max() / 2);
+    parser.add<double>("score-min", 's', "threshold of score", false, 0.01);
     parser.add("multi-select", 'm', "enable multiple selection of lines");
     parser.footer("filename...");
     parser.parse_check(argc, argv);
 
     query = parser.get<std::string>("query");
     prompt = parser.get<std::string>("prompt");
-    score_max = parser.get<std::size_t>("score-max");
+    score_min = parser.get<double>("score-min");
     max_buffer = parser.get<std::size_t>("max-buffer");
     multi_select = parser.exist("multi-select");
 
@@ -74,24 +73,24 @@ public:
   }
 };
 
+struct Choice {
+  std::size_t index;
+  double score = 0;
+  bool selected = false;
+
+public:
+  Choice() = default;
+  Choice(std::size_t index) : index(index) {}
+
+  bool operator>(Choice const& rhs) const { return score > rhs.score; }
+};
+
 // represents a instance of Coco client.
 class Coco {
   enum class Status {
     Selected,
     Escaped,
     Continue,
-  };
-
-  struct Choice {
-    std::size_t index;
-    std::size_t score = 0;
-    bool selected = false;
-
-  public:
-    Choice() = default;
-    Choice(std::size_t index) : index(index) {}
-
-    bool operator<(Choice const& rhs) const { return score < rhs.score; }
   };
 
   Config config;
@@ -236,7 +235,11 @@ private:
   void update_filter_list()
   {
     try {
-      filtered_len = scoring(config.lines, score_by_regex(query), config.score_max);
+      scoring(config.lines, score_by_regex(query));
+
+      filtered_len = std::find_if(choices.begin(), choices.end(),
+                                  [this](auto& choice) { return choice.score <= config.score_min; }) -
+                     choices.begin();
     }
     catch (std::regex_error&) {
     }
@@ -251,21 +254,12 @@ private:
     }
   }
 
-  template <typename Scorer>
-  std::size_t scoring(std::vector<std::string> const& lines, Scorer score, std::size_t score_max)
+  template <typename Scorer> void scoring(std::vector<std::string> const& lines, Scorer score)
   {
-    if (query.empty()) {
-      return lines.size();
-    }
-
     for (auto& choice : choices) {
-      choice.score = score(lines[choice.index]);
+      choice.score = query.empty() ? 1.0 : score(lines[choice.index]);
     }
-    std::stable_sort(choices.begin(), choices.end());
-
-    return std::find_if(choices.begin(), choices.end(),
-                        [score_max](auto& choice) { return choice.score > score_max; }) -
-           choices.begin();
+    std::stable_sort(choices.begin(), choices.end(), std::greater<Choice>{});
   }
 };
 

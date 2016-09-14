@@ -8,6 +8,8 @@ bool is_utf8_first(std::uint8_t ch);
 bool is_utf8_cont(std::uint8_t ch);
 std::size_t get_utf8_char_length(std::uint8_t ch);
 
+std::size_t get_mb_width(std::string const& s);
+
 void pop_back_utf8(std::string& str);
 
 #endif

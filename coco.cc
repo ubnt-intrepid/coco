@@ -71,16 +71,6 @@ public:
   }
 };
 
-struct Selection {
-  bool is_selected = false;
-  std::vector<std::string> lines;
-
-public:
-  Selection() = default;
-  Selection(std::vector<std::string> lines) : is_selected{true}, lines{std::move(lines)} {}
-
-  inline operator bool() const { return is_selected; }
-};
 
 // represents a instance of Coco client.
 class Coco {
@@ -120,7 +110,7 @@ public:
     update_filter_list(); 
   }
 
-  Selection select_line()
+  std::vector<std::string> select_line()
   {
     // initialize ncurses screen.
     Ncurses term;
@@ -136,7 +126,7 @@ public:
           if (choices[i].selected)
             lines.push_back(config.lines[choices[i].index]);
         }
-        return Selection{lines};
+        return lines;
       }
       else if (result == Status::Escaped) {
         break;
@@ -145,7 +135,7 @@ public:
       render_screen(term);
     }
 
-    return Selection{};
+    return {};
   }
 
 private:
@@ -271,13 +261,11 @@ int main(int argc, char const* argv[])
     Coco coco{config};
 
     // retrieve a selection from lines.
-    auto selection = coco.select_line();
+    auto selected_lines = coco.select_line();
 
     // show selected line.
-    if (selection) {
-      for (auto&& line : selection.lines)
+    for (auto&& line : selected_lines)
         std::cout << line << std::endl;
-    }
 
     return 0;
   }

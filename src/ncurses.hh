@@ -5,7 +5,7 @@
 #include <cstdio>
 #include <memory>
 
-enum class Key { Enter, Esc, Alt, Up, Down, Left, Right, Tab, Backspace, Char, Unknown };
+enum class Key { Enter, Esc, Ctrl, Alt, Up, Down, Left, Right, Tab, Backspace, Char, Unknown };
 
 class Event {
   Key key;
@@ -14,10 +14,11 @@ class Event {
 
 public:
   Event(Key key) : key{key}, mod{0}, ch{} {}
-  Event(int mod) : key{Key::Alt}, mod{mod}, ch{} {}
+  Event(Key key, int mod) : key{key}, mod{mod}, ch{} {}
   Event(std::string&& ch) : key{Key::Char}, mod{0}, ch{ch} {}
 
   std::string const& as_chars() const { return ch; }
+  int get_mod() const { return mod; }
 
   inline bool operator==(Key key) const { return this->key == key; }
 };

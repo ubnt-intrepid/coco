@@ -23,12 +23,6 @@ enum class Coco::Status {
   Continue,
 };
 
-enum class FilterMode {
-  CaseSensitive,
-  SmartCase,
-  Regex,
-};
-
 std::ostream& operator<<(std::ostream& os, FilterMode mode)
 {
   switch (mode) {
@@ -221,6 +215,13 @@ auto Coco::handle_key_event(Ncurses& term, Event const& ev) -> Status
   else if (ev == Key::Backspace) {
     if (!query.empty()) {
       pop_back_utf8(query);
+      update_filter_list();
+    }
+    return Status::Continue;
+  }
+  else if (ev == Key::Ctrl) {
+    if (ev.get_mod() == 'r') {
+      filter_mode = static_cast<FilterMode>((static_cast<int>(filter_mode) + 1) % 3);
       update_filter_list();
     }
     return Status::Continue;

@@ -35,7 +35,11 @@ public:
   bool operator>(Choice const& rhs) const { return score > rhs.score; }
 };
 
-enum class FilterMode;
+enum FilterMode {
+  CaseSensitive = 0,
+  SmartCase = 1,
+  Regex = 2,
+};
 
 // represents a instance of Coco client.
 class Ncurses;

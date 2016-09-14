@@ -94,7 +94,7 @@ Event Ncurses::poll_event()
     }
     else {
       ::nodelay(stdscr, false);
-      return Event{ch};
+      return Event{Key::Alt, ch};
     }
   }
   else if (ch == KEY_UP) {
@@ -114,6 +114,9 @@ Event Ncurses::poll_event()
   }
   else if (ch == 127) {
     return Event{Key::Backspace};
+  }
+  else if (ch == 18) {
+    return Event{Key::Ctrl, 'r'};
   }
   else if (is_utf8_first(ch & 0xFF)) {
     ::ungetch(ch);

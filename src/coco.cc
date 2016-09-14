@@ -157,7 +157,7 @@ private:
       term.add_str(2, y + 1, config.lines[choices[y + offset].index]);
 
       if (y == cursor) {
-        term.change_attr(0, y + 1, -1, 0, A_BOLD | A_UNDERLINE);
+        term.change_attr(0, y + 1, -1, 0);
       }
     }
 

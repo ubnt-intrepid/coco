@@ -90,11 +90,21 @@ class Coco {
     Continue,
   };
 
+  struct Choice {
+    std::size_t index;
+    std::size_t score = 0;
+    bool selected = false;
+  public:
+    Choice() = default;
+    Choice(std::size_t index): index(index) {}
+
+    bool operator<(Choice const& rhs) const { return score < rhs.score ;}
+  };
+
   Config config;
   std::string query;
 
-  std::vector<std::size_t> scores;
-  std::vector<bool> selected;
+  std::vector<Choice> choices;
   std::size_t filtered_len = 0;
 
   std::size_t cursor = 0;
@@ -104,7 +114,10 @@ public:
   Coco(Config const& config) : config(config)
   {
     query = config.query;
-    update_filter_list();
+    
+    choices.resize(config.lines.size());
+    std::generate(choices.begin(), choices.end(), [n=0] () mutable { return Choice(n++); });
+    update_filter_list(); 
   }
 
   Selection select_line()
@@ -118,11 +131,10 @@ public:
       auto result = handle_key_event(term, ev);
 
       if (result == Status::Selected) {
-        // FIXME: remove dummy.
         std::vector<std::string> lines;
-        for (std::size_t i = 0; i < selected.size(); ++i) {
-          if (selected[i])
-            lines.push_back(config.lines[i]);
+        for (std::size_t i = 0; i < filtered_len; ++i) {
+          if (choices[i].selected)
+            lines.push_back(config.lines[choices[i].index]);
         }
         return Selection{lines};
       }
@@ -147,10 +159,10 @@ private:
     std::tie(std::ignore, height) = term.get_size();
 
     for (size_t y = 0; y < std::min<size_t>(filtered_len - offset, height - 1); ++y) {
-      if (selected[y + offset]) {
+      if (choices[y + offset].selected) {
         term.add_str(0, y + y_offset, ">");
       }
-      term.add_str(2, y + 1, config.lines[y + offset]);
+      term.add_str(2, y + 1, config.lines[choices[y + offset].index]);
 
       if (y == cursor) {
         term.change_attr(0, y + 1, -1, 0, A_BOLD | A_UNDERLINE);
@@ -219,7 +231,6 @@ private:
 
   void update_filter_list()
   {
-    scores.resize(config.lines.size());
     try {
       auto&& score = regex_score();
       filtered_len = scoring(config.lines, std::move(score), config.score_max);
@@ -238,11 +249,11 @@ private:
       return lines.size();
     }
 
-    std::transform(lines.begin(), lines.end(), scores.begin(), score);
-    std::stable_sort(scores.begin(), scores.end());
+    for ( auto& choice: choices) { choice.score = score(lines[choice.index]); }
+    std::stable_sort(choices.begin(), choices.end());
 
-    return std::find_if(scores.begin(), scores.end(), [score_max](std::size_t score) { return score > score_max; }) -
-           scores.begin();
+    return std::find_if(choices.begin(), choices.end(), [score_max](auto& choice) { return choice.score > score_max; }) -
+           choices.begin();
   }
 };
 

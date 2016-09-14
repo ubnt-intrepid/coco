@@ -2,6 +2,10 @@
 # vim: set fileencoding=utf-8
 
 bld.program(features='cxx cxxprogram test',
+            target='score_test',
+            source='score_test.cc')
+
+bld.program(features='cxx cxxprogram test',
             target='utf8_test',
             source='utf8.cc utf8_test.cc')
 

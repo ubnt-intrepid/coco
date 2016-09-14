@@ -74,6 +74,7 @@ def attach_gmock(self):
         )
         self.bld.has_gmock_objects = True
 
+    self.install_path = ""
     self.use = self.to_list(getattr(self, 'use', [])) + ['GMOCK_OBJECTS']
 
 @feature('test')

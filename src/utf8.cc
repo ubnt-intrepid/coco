@@ -38,7 +38,8 @@ void pop_back_utf8(std::string& str)
   }
 }
 
-std::size_t get_mb_width(std::string const& s) {
+std::size_t get_mb_width(std::string const& s)
+{
   if (get_utf8_char_length(s[0]) < s.size()) {
     throw std::runtime_error(std::string(__FUNCTION__) + ": a UTF-8 character is only allowed.");
   }
@@ -46,9 +47,19 @@ std::size_t get_mb_width(std::string const& s) {
   // http://php.net/manual/ja/function.mb-strwidth.php
   std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> converter;
   std::u32string u32str = converter.from_bytes(s);
-  if      (u32str[0] < 0x0020) { return 0; }
-  else if (u32str[0] >= 0x0020 && u32str[0] < 0x2000) { return 1; }
-  else if (u32str[0] >= 0x2000 && u32str[0] < 0xFF61) { return 2; }
-  else if (u32str[0] >= 0xFF61 && u32str[0] < 0xFF9F) { return 1; }
-  else { return 2; }
+  if (u32str[0] < 0x0020) {
+    return 0;
+  }
+  else if (u32str[0] >= 0x0020 && u32str[0] < 0x2000) {
+    return 1;
+  }
+  else if (u32str[0] >= 0x2000 && u32str[0] < 0xFF61) {
+    return 2;
+  }
+  else if (u32str[0] >= 0xFF61 && u32str[0] < 0xFF9F) {
+    return 1;
+  }
+  else {
+    return 2;
+  }
 }

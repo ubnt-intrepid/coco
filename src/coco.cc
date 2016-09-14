@@ -13,6 +13,7 @@
 
 #include <nanojson.hpp>
 #include <cmdline.h>
+#include "score.hh"
 #include "ncurses.hh"
 #include "utf8.hh"
 
@@ -232,20 +233,10 @@ private:
     }
   }
 
-  auto regex_score() const
-  {
-    std::regex re(query);
-    return [re = std::move(re)](std::string const& line)->std::size_t
-    {
-      return std::regex_search(line, re) ? 1 : std::numeric_limits<std::size_t>::max();
-    };
-  }
-
   void update_filter_list()
   {
     try {
-      auto&& score = regex_score();
-      filtered_len = scoring(config.lines, std::move(score), config.score_max);
+      filtered_len = scoring(config.lines, score_by_regex(query), config.score_max);
     }
     catch (std::regex_error&) {
     }

@@ -47,7 +47,8 @@ TEST(utf8_test, pop_back_utf8)
   EXPECT_EQ(hoge, u8"ほげほ");
 }
 
-TEST(utf8_test, get_mb_width) {
+TEST(utf8_test, get_mb_width)
+{
   EXPECT_EQ(1, get_mb_width(u8"a"));
   EXPECT_EQ(2, get_mb_width(u8"あ"));
   EXPECT_EQ(2, get_mb_width(u8"🍣"));

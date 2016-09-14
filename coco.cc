@@ -1,6 +1,8 @@
+#include <algorithm>
 #include <fstream>
 #include <functional>
 #include <iostream>
+#include <limits>
 #include <locale>
 #include <numeric>
 #include <regex>
@@ -20,6 +22,8 @@ struct Config {
   std::vector<std::string> lines;
   std::string prompt;
   std::string query;
+  std::size_t score_max;
+  std::size_t max_buffer;
 
 public:
   Config() = default;
@@ -33,23 +37,26 @@ public:
     parser.add<std::string>("query", 0, "initial value for query", false, "");
     parser.add<std::string>("prompt", 0, "specify the prompt string", false, "QUERY> ");
     parser.add<std::size_t>("max-buffer", 'b', "maximum length of lines", false, 4096);
+    parser.add<std::size_t>("score-max", 's', "maximum of scorering number", false,
+                            std::numeric_limits<std::size_t>::max() / 2);
     parser.footer("filename...");
     parser.parse_check(argc, argv);
 
     query = parser.get<std::string>("query");
     prompt = parser.get<std::string>("prompt");
-    auto max_len = parser.get<std::size_t>("max-buffer");
+    score_max = parser.get<std::size_t>("score-max");
+    max_buffer = parser.get<std::size_t>("max-buffer");
 
     lines.resize(0);
-    lines.reserve(max_len);
+    lines.reserve(max_buffer);
     if (parser.rest().size() > 0) {
       for (auto&& path : parser.rest()) {
         std::ifstream ifs{path};
-        read_lines(ifs, max_len);
+        read_lines(ifs, max_buffer);
       }
     }
     else {
-      read_lines(std::cin, max_len);
+      read_lines(std::cin, max_buffer);
     }
   }
 
@@ -185,26 +192,35 @@ private:
     }
   }
 
+  auto regex_score() const
+  {
+    std::regex re(query);
+    return [re = std::move(re)](std::string const& line)->std::size_t
+    {
+      return std::regex_search(line, re) ? 1 : std::numeric_limits<std::size_t>::max();
+    };
+  }
+
   void update_filter_list()
   {
-    filter_by_regex(filtered, config.lines);
+    choice(filtered, config.lines, regex_score(), config.score_max);
     cursor = 0;
     offset = 0;
   }
 
-  void filter_by_regex(std::vector<std::size_t>& filtered, std::vector<std::string> const& lines) const
+  template <typename Scorer>
+  void choice(std::vector<std::size_t>& filtered, std::vector<std::string> const& lines, Scorer score,
+              std::size_t score_max) const
   {
-    if (query.empty()) {
-      filtered.resize(lines.size());
-      std::iota(filtered.begin(), filtered.end(), 0);
-    }
-    else {
-      std::regex re(query);
-      filtered.resize(0);
-      for (std::size_t i = 0; i < lines.size(); ++i) {
-        if (std::regex_search(lines[i], re)) {
-          filtered.push_back(i);
-        }
+    filtered.resize(lines.size());
+    std::iota(filtered.begin(), filtered.end(), 0);
+
+    if (!query.empty()) {
+      auto pos = std::stable_partition(filtered.begin(), filtered.end(), [
+        score = std::move(score), score_max, lines = static_cast<std::vector<std::string> const&>(lines)
+      ](std::size_t idx) { return score(lines[idx]) <= score_max; });
+      if (pos < filtered.end()) {
+        filtered.resize(pos - filtered.begin());
       }
     }
   }

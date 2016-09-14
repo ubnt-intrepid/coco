@@ -1,9 +1,17 @@
 #!/usr/bin/env python
 # vim: set fileencoding=utf-8
 
+INCLUDES = [
+  '.',
+  '../external',
+  '../external/boostpp/include',
+  '../external/levenshtein-sse',
+]
+ 
 bld.program(features='cxx cxxprogram test',
             target='score_test',
-            source='score_test.cc')
+            source='score_test.cc',
+            includes = INCLUDES)
 
 bld.program(features='cxx cxxprogram test',
             target='utf8_test',
@@ -12,5 +20,5 @@ bld.program(features='cxx cxxprogram test',
 bld.program(features='cxx cxxprogram',
             target='coco',
             source='coco.cc ncurses.cc utf8.cc',
-            includes = ['.', '../external', '../external/boostpp/include'],
+            includes = INCLUDES,
             use = 'NCURSESW')

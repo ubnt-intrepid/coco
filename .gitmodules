@@ -1,3 +1,6 @@
 [submodule "external/preprocessor"]
 	path = external/boostpp
 	url = https://github.com/boostorg/preprocessor.git
+[submodule "external/levenshtein-sse"]
+	path = external/levenshtein-sse
+	url = https://github.com/addaleax/levenshtein-sse.git

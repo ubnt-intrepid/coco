@@ -154,7 +154,7 @@ void Coco::render_screen(Ncurses& term)
   std::string query_str = config.prompt + query;
 
   std::stringstream ss;
-  ss << filter_mode;
+  ss << filter_mode << " [" << cursor + offset << "/" << filtered_len << "]";
   std::string mode_str = ss.str();
 
   term.add_str(width - 1 - mode_str.length(), 0, mode_str);

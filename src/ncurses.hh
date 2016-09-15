@@ -44,6 +44,7 @@ public:
   void refresh();
   std::tuple<int, int> get_size() const;
   void add_str(int x, int y, std::string const& text);
+
   void change_attr(int x, int y, int n, int col);
 };
 

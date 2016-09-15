@@ -42,9 +42,8 @@ Ncurses::Ncurses()
   ::ESCDELAY = 25;        // set delay time
 
   // initialize colormap.
-  start_color();
-  ::init_pair(1, COLOR_WHITE, COLOR_BLACK);
-  ::init_pair(2, COLOR_RED, COLOR_WHITE);
+  // start_color();
+  // ::init_pair(1, COLOR_RED, COLOR_WHITE);
 }
 
 Ncurses::~Ncurses()
@@ -74,9 +73,9 @@ void Ncurses::add_str(int x, int y, std::string const& text) { mvwaddstr(stdscr,
 
 void Ncurses::change_attr(int x, int y, int n, int col)
 {
-  attrset(COLOR_PAIR(col));
+  // attrset(COLOR_PAIR(col));
   mvwchgat(stdscr, y, x, n, A_BOLD | A_UNDERLINE, col, nullptr);
-  attrset(COLOR_PAIR(1));
+  // attrset(COLOR_PAIR(0));
 }
 
 Event Ncurses::poll_event()

@@ -57,6 +57,7 @@ def configure(conf):
         conf.msg('Unpacking gmock', 'no')
         Logs.error(sys.exc_info()[1])
 
+    conf.check_cxx(lib='pthread', uselib_store='PTHREAD')
 
 @feature('test')
 @before_method('process_source')
@@ -71,6 +72,7 @@ def attach_gmock(self):
             ],
             includes = [GMOCK_UNPACK_DIR],
             export_includes = [GMOCK_UNPACK_DIR],
+            use = 'PTHREAD',
         )
         self.bld.has_gmock_objects = True
 

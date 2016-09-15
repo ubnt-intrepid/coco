@@ -111,7 +111,7 @@ Event Ncurses::poll_event()
   else if (ch == 9) {
     return Event{Key::Tab};
   }
-  else if (ch == 127) {
+  else if (ch == 127 || ch == KEY_BACKSPACE) {
     return Event{Key::Backspace};
   }
   else if (ch == 18) {

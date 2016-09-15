@@ -5,6 +5,14 @@
 #include <cstdio>
 #include <memory>
 
+// forward declaration of curses structs.
+struct screen;
+struct _win_st;
+typedef struct screen SCREEN;
+typedef struct _win_st WINDOW;
+
+namespace curses {
+
 enum class Key { Enter, Esc, Ctrl, Alt, Up, Down, Left, Right, Tab, Backspace, Char, Unknown };
 
 class Event {
@@ -24,19 +32,19 @@ public:
 };
 
 // wrapper of Ncurses API.
-class Ncurses {
+class Window {
   struct deleter_t {
     void operator()(FILE* fd) { ::fclose(fd); }
   };
 
   std::unique_ptr<FILE, deleter_t> tty_in, tty_out;
-  struct screen* screen;
-  struct screen* screen_orig;
+  SCREEN* scr = nullptr;
+  WINDOW* win = nullptr;
 
 public:
-  Ncurses();
-  Ncurses(Ncurses&&) noexcept = default;
-  ~Ncurses();
+  Window();
+  Window(Window&&) noexcept = default;
+  ~Window();
 
   Event poll_event();
 
@@ -47,5 +55,7 @@ public:
 
   void change_attr(int x, int y, int n, int col);
 };
+
+} // namespace curses;
 
 #endif

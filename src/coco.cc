@@ -17,6 +17,10 @@
 #include "ncurses.hh"
 #include "utf8.hh"
 
+using curses::Window;
+using curses::Event;
+using curses::Key;
+
 enum class Coco::Status {
   Selected,
   Escaped,
@@ -108,12 +112,11 @@ Coco::Coco(Config const& config) : config(config)
 std::vector<std::string> Coco::select_line()
 {
   // initialize ncurses screen.
-  Ncurses term;
+  Window term;
   render_screen(term);
 
   while (true) {
-    Event ev = term.poll_event();
-    auto result = handle_key_event(term, ev);
+    auto result = handle_key_event(term);
 
     if (result == Status::Selected) {
       std::vector<std::string> lines;
@@ -133,7 +136,7 @@ std::vector<std::string> Coco::select_line()
   return {};
 }
 
-void Coco::render_screen(Ncurses& term)
+void Coco::render_screen(Window& term)
 {
   term.erase();
 
@@ -163,8 +166,10 @@ void Coco::render_screen(Ncurses& term)
   term.refresh();
 }
 
-auto Coco::handle_key_event(Ncurses& term, Event const& ev) -> Status
+auto Coco::handle_key_event(Window& term) -> Status
 {
+  auto ev = term.poll_event();
+
   if (ev == Key::Enter) {
     return Status::Selected;
   }

@@ -6,6 +6,11 @@
 #include <string>
 #include <vector>
 
+namespace curses {
+class Window;
+class Event;
+}
+
 struct Config {
   std::vector<std::string> lines;
   std::string prompt;
@@ -42,8 +47,6 @@ enum FilterMode {
 };
 
 // represents a instance of Coco client.
-class Ncurses;
-class Event;
 class Coco {
   enum class Status;
 
@@ -63,8 +66,8 @@ public:
   std::vector<std::string> select_line();
 
 private:
-  void render_screen(Ncurses& term);
-  Status handle_key_event(Ncurses& term, Event const& ev);
+  void render_screen(curses::Window& term);
+  Status handle_key_event(curses::Window& term);
   void update_filter_list();
 
   template <typename Scorer> void scoring(std::vector<std::string> const& lines, Scorer score);

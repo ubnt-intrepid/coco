@@ -4,17 +4,19 @@
 #include <stdexcept>
 #include "utf8.hh"
 
-namespace {
-std::string get_utf8_char()
+namespace curses {
+
+// get an array of bytes represents a UTF-8 character from window.
+std::string get_utf8_char(WINDOW* window)
 {
   std::array<uint8_t, 6> buf{0};
 
-  auto ch0 = static_cast<uint8_t>(::wgetch(stdscr) & 0x000000FF);
+  auto ch0 = static_cast<uint8_t>(::wgetch(window) & 0x000000FF);
   size_t len = get_utf8_char_length(ch0);
   buf[0] = ch0;
 
   for (size_t i = 1; i < len; ++i) {
-    auto ch = static_cast<uint8_t>(::wgetch(stdscr) & 0x000000FF);
+    auto ch = static_cast<uint8_t>(::wgetch(window) & 0x000000FF);
     if (!is_utf8_cont(ch)) {
       throw std::runtime_error(std::string(__FUNCTION__) + ": wrong byte exists");
     }
@@ -23,76 +25,66 @@ std::string get_utf8_char()
 
   return std::string(buf.data(), buf.data() + len);
 }
-}
 
-Ncurses::Ncurses()
+Window::Window()
 {
-  // create a new terminal
   tty_in.reset(fopen("/dev/tty", "r"));
   tty_out.reset(fopen("/dev/tty", "w"));
-  screen = ::newterm(getenv("TERM"), tty_out.get(), tty_in.get());
 
-  // switch to the current screen.
-  screen_orig = ::set_term(screen);
+  // create a new terminal
+  scr = ::newterm(getenv("TERM"), tty_out.get(), tty_in.get());
+  win = stdscr;
 
   // setup
-  ::noecho();             // do not echo back characters
-  ::cbreak();             // without buffering
-  ::keypad(stdscr, true); // convert escape sequeces to key code
-  ::ESCDELAY = 25;        // set delay time
+  ::noecho();          // do not echo back characters
+  ::cbreak();          // without buffering
+  ::keypad(win, true); // convert escape sequeces to key code
+  ::ESCDELAY = 25;     // set delay time
 
   // initialize colormap.
   // start_color();
   // ::init_pair(1, COLOR_RED, COLOR_WHITE);
 }
 
-Ncurses::~Ncurses()
+Window::~Window()
 {
   // reset current screen.
   ::endwin();
 
-  // switch to original screen.
-  ::set_term(screen_orig);
-
   // release all resources of current session.
-  ::delscreen(screen);
+  ::delscreen(scr);
 }
 
-void Ncurses::erase() { ::werase(stdscr); }
+void Window::erase() { ::werase(win); }
 
-void Ncurses::refresh() { ::wrefresh(stdscr); }
+void Window::refresh() { ::wrefresh(win); }
 
-std::tuple<int, int> Ncurses::get_size() const
+std::tuple<int, int> Window::get_size() const
 {
   int width, height;
-  getmaxyx(stdscr, height, width);
+  getmaxyx(win, height, width);
   return std::make_tuple(width, height);
 }
 
-void Ncurses::add_str(int x, int y, std::string const& text) { mvwaddstr(stdscr, y, x, text.c_str()); }
+void Window::add_str(int x, int y, std::string const& text) { mvwaddstr(win, y, x, text.c_str()); }
 
-void Ncurses::change_attr(int x, int y, int n, int col)
-{
-  // attrset(COLOR_PAIR(col));
-  mvwchgat(stdscr, y, x, n, A_BOLD | A_UNDERLINE, col, nullptr);
-  // attrset(COLOR_PAIR(0));
-}
+void Window::change_attr(int x, int y, int n, int col) { mvwchgat(win, y, x, n, A_BOLD | A_UNDERLINE, col, nullptr); }
 
-Event Ncurses::poll_event()
+Event Window::poll_event()
 {
-  int ch = ::wgetch(stdscr);
+  int ch = ::wgetch(win);
   if (ch == 10) {
     return Event{Key::Enter};
   }
   else if (ch == 27) {
-    ::nodelay(stdscr, true);
-    int ch = ::wgetch(stdscr);
+    ::nodelay(win, true);
+    int ch = ::wgetch(win);
     if (ch == -1) {
-      ::nodelay(stdscr, false);
+      ::nodelay(win, false);
       return Event{Key::Esc};
     }
     else {
-      ::nodelay(stdscr, false);
+      ::nodelay(win, false);
       return Event{Key::Alt, ch};
     }
   }
@@ -119,10 +111,12 @@ Event Ncurses::poll_event()
   }
   else if (is_utf8_first(ch & 0xFF)) {
     ::ungetch(ch);
-    auto ch = get_utf8_char();
+    auto ch = get_utf8_char(win);
     return Event{std::move(ch)};
   }
   else {
     return Event{Key::Unknown};
   }
 }
+
+} // namespace curses;

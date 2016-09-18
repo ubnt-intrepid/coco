@@ -245,7 +245,7 @@ void Coco::update_filter_list()
 {
   try {
     auto scorer = score_by(filter_mode, query);
-    scoring(config.lines, std::ref(*scorer));
+    scorer->scoring(choices, config.lines);
     filtered_len = std::find_if(choices.begin(), choices.end(),
                                 [this](auto& choice) { return choice.score <= config.score_min; }) -
                    choices.begin();
@@ -261,12 +261,4 @@ void Coco::update_filter_list()
     }
     choices[0].selected = true;
   }
-}
-
-template <typename Scorer> void Coco::scoring(std::vector<std::string> const& lines, Scorer score)
-{
-  for (auto& choice : choices) {
-    choice.score = query.empty() ? 1.0 : score(lines[choice.index]);
-  }
-  std::stable_sort(choices.begin(), choices.end(), std::greater<Choice>{});
 }

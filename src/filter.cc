@@ -7,11 +7,19 @@
 #include <limits>
 #include <sstream>
 
+void Filter::scoring(std::vector<Choice>& choices, std::vector<std::string> const& lines)
+{
+  for (auto& choice : choices) {
+    choice.score = query.empty() ? 1.0 : (*this)(lines[choice.index]);
+  }
+  std::stable_sort(choices.begin(), choices.end(), std::greater<Choice>{});
+}
+
 class CaseSensitiveFilter : public Filter {
   std::vector<std::string> words;
 
 public:
-  CaseSensitiveFilter(std::string const& query)
+  CaseSensitiveFilter(std::string const& query) : Filter{query}
   {
     std::istringstream iss(query);
     for (std::string word; std::getline(iss, word, ' ');) {
@@ -34,7 +42,7 @@ class SmartCaseFilter : public Filter {
   std::locale l;
 
 public:
-  SmartCaseFilter(std::string const& query) : l{std::locale::classic()}
+  SmartCaseFilter(std::string const& query) : Filter{query}, l{std::locale::classic()}
   {
     std::istringstream iss(query);
     for (std::string word; std::getline(iss, word, ' ');) {
@@ -61,7 +69,7 @@ class RegexFilter : public Filter {
   std::regex re;
 
 public:
-  RegexFilter(std::string const& query) : re{query} {}
+  RegexFilter(std::string const& query) : Filter{query}, re{query} {}
 
   double operator()(std::string const& line) const override { return std::regex_search(line, re) ? 1.0 : 0.0; }
 };

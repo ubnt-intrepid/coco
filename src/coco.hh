@@ -6,6 +6,7 @@
 #include <string>
 #include <vector>
 #include "filter.hh"
+#include "choice.hh"
 
 namespace curses {
 class Window;
@@ -27,18 +28,6 @@ public:
 
   void read_from(int argc, char const** argv);
   void read_lines(std::istream& is, std::size_t max_len);
-};
-
-struct Choice {
-  std::size_t index;
-  double score = 0;
-  bool selected = false;
-
-public:
-  Choice() = default;
-  Choice(std::size_t index) : index(index) {}
-
-  bool operator>(Choice const& rhs) const { return score > rhs.score; }
 };
 
 // represents a instance of Coco client.
@@ -64,8 +53,6 @@ private:
   void render_screen(curses::Window& term);
   Status handle_key_event(curses::Window& term);
   void update_filter_list();
-
-  template <typename Scorer> void scoring(std::vector<std::string> const& lines, Scorer score);
 };
 
 #endif

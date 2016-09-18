@@ -240,6 +240,12 @@ void Coco::update_filter_list()
   catch (std::regex_error&) {
   }
 
+  // mark hidden choices unselected.
+  for (size_t i = filtered_len; i < choices.size(); ++i) {
+    choices[i].selected = false;
+  }
+
+  // reset cursor
   cursor = 0;
   offset = 0;
 }

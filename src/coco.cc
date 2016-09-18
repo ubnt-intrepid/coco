@@ -53,7 +53,6 @@ void Config::read_from(int argc, char const** argv)
   parser.add<double>("score-min", 's', "threshold of score", false, 0.01);
   parser.add<std::string>("filter", 'f', "type of filter", false, "smart-case",
                           cmdline::oneof<std::string>("case-sensitive", "smart-case", "regex"));
-  parser.add("multi-select", 'm', "enable multiple selection of lines");
   parser.footer("filename...");
   parser.parse_check(argc, argv);
 
@@ -61,7 +60,6 @@ void Config::read_from(int argc, char const** argv)
   prompt = parser.get<std::string>("prompt");
   score_min = parser.get<double>("score-min");
   max_buffer = parser.get<std::size_t>("max-buffer");
-  multi_select = parser.exist("multi-select");
   filter = parser.get<std::string>("filter");
 
   lines.resize(0);
@@ -124,7 +122,12 @@ std::vector<std::string> Coco::select_line()
         if (choices[i].selected)
           lines.push_back(config.lines[choices[i].index]);
       }
-      return lines;
+      if (lines.empty()) {
+        return {config.lines[cursor + offset]};
+      }
+      else {
+        return lines;
+      }
     }
     else if (result == Status::Escaped) {
       break;
@@ -177,17 +180,11 @@ auto Coco::handle_key_event(Window& term) -> Status
     return Status::Escaped;
   }
   else if (ev == Key::Up) {
-    if (!config.multi_select) {
-      choices[cursor + offset].selected = false;
-    }
     if (cursor == 0) {
       offset = std::max(0, (int)offset - 1);
     }
     else {
       cursor--;
-    }
-    if (!config.multi_select) {
-      choices[cursor + offset].selected = true;
     }
     return Status::Continue;
   }
@@ -195,26 +192,16 @@ auto Coco::handle_key_event(Window& term) -> Status
     int height;
     std::tie(std::ignore, height) = term.get_size();
 
-    if (!config.multi_select) {
-      choices[cursor + offset].selected = false;
-    }
-
     if (cursor == static_cast<size_t>(height - 1 - y_offset)) {
       offset = std::min<size_t>(offset + 1, std::max<int>(0, filtered_len - height + y_offset));
     }
     else {
       cursor = std::min<size_t>(cursor + 1, std::min<size_t>(filtered_len - offset, height - y_offset) - 1);
     }
-
-    if (!config.multi_select) {
-      choices[cursor + offset].selected = true;
-    }
     return Status::Continue;
   }
   else if (ev == Key::Tab) {
-    if (config.multi_select) {
-      choices[cursor + offset].selected ^= true;
-    }
+    choices[cursor + offset].selected ^= true;
     return Status::Continue;
   }
   else if (ev == Key::Backspace) {
@@ -255,10 +242,4 @@ void Coco::update_filter_list()
 
   cursor = 0;
   offset = 0;
-  if (!config.multi_select) {
-    for (auto& choice : choices) {
-      choice.selected = false;
-    }
-    choices[0].selected = true;
-  }
 }

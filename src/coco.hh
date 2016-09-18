@@ -19,7 +19,6 @@ struct Config {
   std::string query;
   double score_min;
   std::size_t max_buffer;
-  bool multi_select;
   std::string filter;
 
 public:

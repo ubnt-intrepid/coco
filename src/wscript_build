@@ -2,8 +2,8 @@
 # vim: set fileencoding=utf-8
 
 bld.program(features='cxx cxxprogram test',
-            target='score_test',
-            source='score_test.cc')
+            target='filter_test',
+            source='filter.cc filter_test.cc')
 
 bld.program(features='cxx cxxprogram test',
             target='utf8_test',
@@ -11,6 +11,6 @@ bld.program(features='cxx cxxprogram test',
 
 bld.program(features='cxx cxxprogram',
             target='coco',
-            source='coco_main.cc coco.cc ncurses.cc utf8.cc',
+            source='coco_main.cc coco.cc ncurses.cc utf8.cc filter.cc',
             includes = ['.', '../external', '../external/boostpp/include'],
             use = 'NCURSESW')

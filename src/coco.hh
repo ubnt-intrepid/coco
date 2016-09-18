@@ -5,6 +5,7 @@
 #include <iostream>
 #include <string>
 #include <vector>
+#include "filter.hh"
 
 namespace curses {
 class Window;
@@ -38,12 +39,6 @@ public:
   Choice(std::size_t index) : index(index) {}
 
   bool operator>(Choice const& rhs) const { return score > rhs.score; }
-};
-
-enum FilterMode {
-  CaseSensitive = 0,
-  SmartCase = 1,
-  Regex = 2,
 };
 
 // represents a instance of Coco client.

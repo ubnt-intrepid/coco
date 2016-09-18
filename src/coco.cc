@@ -13,7 +13,7 @@
 
 #include <nanojson.hpp>
 #include <cmdline.h>
-#include "score.hh"
+#include "filter.hh"
 #include "ncurses.hh"
 #include "utf8.hh"
 
@@ -244,15 +244,8 @@ auto Coco::handle_key_event(Window& term) -> Status
 void Coco::update_filter_list()
 {
   try {
-    if (filter_mode == FilterMode::CaseSensitive) {
-      scoring(config.lines, score_case_sensitive(query));
-    }
-    else if (filter_mode == FilterMode::SmartCase) {
-      scoring(config.lines, score_smart_case(query));
-    }
-    else if (filter_mode == FilterMode::Regex) {
-      scoring(config.lines, score_by_regex(query));
-    }
+    auto scorer = score_by(filter_mode, query);
+    scoring(config.lines, std::ref(*scorer));
     filtered_len = std::find_if(choices.begin(), choices.end(),
                                 [this](auto& choice) { return choice.score <= config.score_min; }) -
                    choices.begin();

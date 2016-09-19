@@ -7,6 +7,7 @@ AllowShortIfStatementsOnASingleLine: false
 IndentCaseLabels: false
 ColumnLimit: 120
 SortIncludes: false
+AlwaysBreakTemplateDeclarations: true
 
 ---
 Language: Cpp

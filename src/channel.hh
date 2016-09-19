@@ -28,7 +28,6 @@ public:
     cv.notify_one();
   }
 
-
   T recv()
   {
     std::unique_lock<std::mutex> lock{m};
@@ -47,9 +46,21 @@ public:
   sender() = default;
   sender(std::shared_ptr<channel<T>> ch) : ch{std::move(ch)} {}
 
-  void send() { if (ch) ch->send({}); }
-  void send(T const& val) { if (ch) ch->send(val); }
-  void send(T && val) { if (ch) ch->send(val); }
+  void send()
+  {
+    if (ch)
+      ch->send({});
+  }
+  void send(T const& val)
+  {
+    if (ch)
+      ch->send(val);
+  }
+  void send(T&& val)
+  {
+    if (ch)
+      ch->send(val);
+  }
 };
 
 template <typename T>
@@ -65,7 +76,12 @@ public:
 
   receiver(std::shared_ptr<channel<T>> ch) : ch{std::move(ch)} {}
 
-  T recv() { if (!ch) throw std::logic_error(""); return ch->recv(); }
+  T recv()
+  {
+    if (!ch)
+      throw std::logic_error("");
+    return ch->recv();
+  }
 };
 
 template <typename T>

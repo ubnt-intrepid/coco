@@ -7,6 +7,40 @@
 #include <limits>
 #include <sstream>
 
+std::ostream& operator<<(std::ostream& os, FilterMode mode)
+{
+  switch (mode) {
+  case FilterMode::CaseSensitive:
+    return os << "CaseSensitive";
+  case FilterMode::SmartCase:
+    return os << "SmartCase";
+  case FilterMode::Regex:
+    return os << "Regex";
+  default:
+    throw std::logic_error(std::string(__FUNCTION__) + ": bad enum");
+  }
+}
+
+std::istream& operator>>(std::istream& is, FilterMode& mode)
+{
+  std::string str;
+  is >> str;
+
+  if (str == "CaseSensitive") {
+    mode = FilterMode::CaseSensitive;
+  }
+  else if (str == "SmartCase") {
+    mode = FilterMode::SmartCase;
+  }
+  else if (str == "Regex") {
+    mode = FilterMode::Regex;
+  }
+  else {
+    throw std::logic_error(std::string(__FUNCTION__) + ": bad option");
+  }
+  return is;
+}
+
 void Filter::scoring(std::vector<Choice>& choices, std::vector<std::string> const& lines)
 {
   for (auto& choice : choices) {
@@ -31,9 +65,12 @@ public:
 
   double operator()(std::string const& line) const override
   {
-    return std::all_of(words.begin(), words.end(), [&](auto& word) { return line.find(word) != std::string::npos; })
-               ? 1
-               : 0;
+    for (auto& word : words) {
+      if (line.find(word) == std::string::npos) {
+        return false;
+      }
+    }
+    return true;
   }
 };
 
@@ -54,14 +91,13 @@ public:
 
   double operator()(std::string const& line) const override
   {
-    return std::all_of(words.begin(), words.end(),
-                       [&](auto& word) {
-                         return std::search(line.begin(), line.end(), word.begin(), word.end(), [&](auto c1, auto c2) {
-                                  return std::toupper(c1, l) == std::toupper(c2, l);
-                                }) != line.end();
-                       })
-               ? 1
-               : 0;
+    auto pred = [&](auto c1, auto c2) { return std::toupper(c1, l) == std::toupper(c2, l); };
+    for (auto& word : words) {
+      if (std::search(line.begin(), line.end(), word.begin(), word.end(), pred) == line.end()) {
+        return false;
+      }
+    }
+    return true;
   }
 };
 

@@ -1,6 +1,7 @@
 #ifndef __HEADER_ALGO__
 #define __HEADER_ALGO__
 
+#include <iosfwd>
 #include <vector>
 #include <string>
 #include <memory>
@@ -11,6 +12,9 @@ enum FilterMode {
   SmartCase = 1,
   Regex = 2,
 };
+
+std::ostream& operator<<(std::ostream& os, FilterMode mode);
+std::istream& operator>>(std::istream& is, FilterMode& mode);
 
 class Filter {
   std::string query;

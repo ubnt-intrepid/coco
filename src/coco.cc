@@ -27,20 +27,6 @@ enum class Coco::Status {
   Continue,
 };
 
-std::ostream& operator<<(std::ostream& os, FilterMode mode)
-{
-  switch (mode) {
-  case FilterMode::CaseSensitive:
-    return os << "CaseSensitive";
-  case FilterMode::SmartCase:
-    return os << "SmartCase";
-  case FilterMode::Regex:
-    return os << "Regex";
-  default:
-    throw std::logic_error(std::string(__FUNCTION__) + ": bad enum");
-  }
-}
-
 constexpr size_t y_offset = 1;
 
 void Config::read_from(int argc, char const** argv)
@@ -51,8 +37,8 @@ void Config::read_from(int argc, char const** argv)
   parser.add<std::string>("prompt", 0, "specify the prompt string", false, "QUERY> ");
   parser.add<std::size_t>("max-buffer", 'b', "maximum length of lines", false, 4096);
   parser.add<double>("score-min", 's', "threshold of score", false, 0.01);
-  parser.add<std::string>("filter", 'f', "type of filter", false, "smart-case",
-                          cmdline::oneof<std::string>("case-sensitive", "smart-case", "regex"));
+  parser.add<std::string>("filter", 'f', "type of filter", false, "SmartCase",
+                          cmdline::oneof<std::string>("CaseSensitive", "SmartCase", "Regex"));
   parser.footer("filename...");
   parser.parse_check(argc, argv);
 
@@ -89,18 +75,8 @@ Coco::Coco(Config const& config) : config(config)
 {
   query = config.query;
 
-  if (config.filter == "case-sensitive") {
-    filter_mode = FilterMode::CaseSensitive;
-  }
-  else if (config.filter == "smart-case") {
-    filter_mode = FilterMode::SmartCase;
-  }
-  else if (config.filter == "regex") {
-    filter_mode = FilterMode::Regex;
-  }
-  else {
-    throw std::logic_error(std::string(__FUNCTION__) + ": bad option");
-  }
+  std::stringstream ss{config.filter};
+  ss >> filter_mode;
 
   choices.resize(config.lines.size());
   std::generate(choices.begin(), choices.end(), [n = 0]() mutable { return Choice(n++); });

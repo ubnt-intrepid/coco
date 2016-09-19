@@ -13,8 +13,11 @@ class Window;
 class Event;
 }
 
-struct Config {
+struct Candidates {
   std::vector<std::string> lines;
+};
+
+struct Config {
   std::string prompt;
   std::string query;
   double score_min;
@@ -23,10 +26,7 @@ struct Config {
 
 public:
   Config() = default;
-  Config(int argc, char const** argv) { read_from(argc, argv); }
-
-  void read_from(int argc, char const** argv);
-  void read_lines(std::istream& is, std::size_t max_len);
+  Candidates parse_args(int argc, char const** argv);
 };
 
 // represents a instance of Coco client.
@@ -34,6 +34,7 @@ class Coco {
   enum class Status;
 
   Config config;
+  Candidates candidates;
   std::string query;
 
   std::vector<Choice> choices;
@@ -45,7 +46,7 @@ class Coco {
   FilterMode filter_mode;
 
 public:
-  Coco(Config const& config);
+  Coco(Config const& config, Candidates candidates);
   std::vector<std::string> select_line();
 
 private:

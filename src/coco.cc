@@ -29,7 +29,17 @@ enum class Coco::Status {
 
 constexpr size_t y_offset = 1;
 
-void Config::read_from(int argc, char const** argv)
+void read_lines(std::vector<std::string>& lines, std::istream& is, std::size_t max_len)
+{
+  static std::regex ansi(R"(\x1B\[([0-9]{1,2}(;[0-9]{1,2})?)?[m|K])");
+  for (std::string line; std::getline(is, line);) {
+    if (lines.size() == max_len)
+      return;
+    lines.push_back(std::regex_replace(line, ansi, ""));
+  }
+}
+
+Candidates Config::parse_args(int argc, char const** argv)
 {
   cmdline::parser parser;
   parser.set_program_name("coco");
@@ -48,37 +58,28 @@ void Config::read_from(int argc, char const** argv)
   max_buffer = parser.get<std::size_t>("max-buffer");
   filter = parser.get<std::string>("filter");
 
-  lines.resize(0);
+  std::vector<std::string> lines;
   lines.reserve(max_buffer);
   if (parser.rest().size() > 0) {
     for (auto&& path : parser.rest()) {
       std::ifstream ifs{path};
-      read_lines(ifs, max_buffer);
+      read_lines(lines, ifs, max_buffer);
     }
   }
   else {
-    read_lines(std::cin, max_buffer);
+    read_lines(lines, std::cin, max_buffer);
   }
+  return Candidates{std::move(lines)};
 }
 
-void Config::read_lines(std::istream& is, std::size_t max_len)
-{
-  static std::regex ansi(R"(\x1B\[([0-9]{1,2}(;[0-9]{1,2})?)?[m|K])");
-  for (std::string line; std::getline(is, line);) {
-    if (lines.size() == max_len)
-      return;
-    lines.push_back(std::regex_replace(line, ansi, ""));
-  }
-}
-
-Coco::Coco(Config const& config) : config(config)
+Coco::Coco(Config const& config, Candidates candidates) : config(config), candidates(candidates)
 {
   query = config.query;
 
   std::stringstream ss{config.filter};
   ss >> filter_mode;
 
-  choices.resize(config.lines.size());
+  choices.resize(candidates.lines.size());
   std::generate(choices.begin(), choices.end(), [n = 0]() mutable { return Choice(n++); });
   update_filter_list();
 }
@@ -96,10 +97,10 @@ std::vector<std::string> Coco::select_line()
       std::vector<std::string> lines;
       for (std::size_t i = 0; i < filtered_len; ++i) {
         if (choices[i].selected)
-          lines.push_back(config.lines[choices[i].index]);
+          lines.push_back(candidates.lines[choices[i].index]);
       }
       if (lines.empty()) {
-        return {config.lines[cursor + offset]};
+        return {candidates.lines[cursor + offset]};
       }
       else {
         return lines;
@@ -126,7 +127,7 @@ void Coco::render_screen(Window& term)
     if (choices[y + offset].selected) {
       term.add_str(0, y + y_offset, ">");
     }
-    term.add_str(2, y + 1, config.lines[choices[y + offset].index]);
+    term.add_str(2, y + 1, candidates.lines[choices[y + offset].index]);
 
     if (y == cursor) {
       term.change_attr(0, y + 1, -1, 0);
@@ -208,7 +209,7 @@ void Coco::update_filter_list()
 {
   try {
     auto scorer = score_by(filter_mode, query);
-    scorer->scoring(choices, config.lines);
+    scorer->scoring(choices, candidates.lines);
     filtered_len = std::find_if(choices.begin(), choices.end(),
                                 [this](auto& choice) { return choice.score <= config.score_min; }) -
                    choices.begin();

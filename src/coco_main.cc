@@ -8,8 +8,10 @@ int main(int argc, char const* argv[])
 
   try {
     // Initialize Coco application.
-    Config config{argc, argv};
-    Coco coco{config};
+    Config config;
+    auto candidates = config.parse_args(argc, argv);
+
+    Coco coco{config, candidates};
 
     // retrieve a selection from lines.
     auto selected_lines = coco.select_line();

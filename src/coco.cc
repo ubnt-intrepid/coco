@@ -26,6 +26,18 @@ enum class Coco::Status {
   Continue,
 };
 
+enum class Coco::Keymap {
+  FinishSelectition,
+  CancelSelection,
+  CursorIncrement,
+  CursorDecrement,
+  ToggleSelection,
+  RotateFilter,
+  PopQuery,
+  PushQuery,
+  Unknown,
+};
+
 constexpr size_t y_offset = 1;
 
 void Config::parse_args(int argc, char const** argv)
@@ -156,17 +168,51 @@ void Coco::render_screen(Window& term)
   term.refresh();
 }
 
-auto Coco::handle_key_event(Window& term) -> Status
+auto Coco::apply_keymap(Event ev, std::string& ch) -> Keymap
 {
-  auto ev = term.poll_event();
-
   if (ev == Key::Enter) {
-    return Status::Selected;
+    return Keymap::FinishSelectition;
   }
   else if (ev == Key::Esc) {
-    return Status::Escaped;
+    return Keymap::CancelSelection;
   }
   else if (ev == Key::Up) {
+    return Keymap::CursorDecrement;
+  }
+  else if (ev == Key::Down) {
+    return Keymap::CursorDecrement;
+  }
+  else if (ev == Key::Tab) {
+    return Keymap::ToggleSelection;
+  }
+  else if (ev == Key::Backspace) {
+    return Keymap::PopQuery;
+  }
+  else if (ev == Key::Char) {
+    ch = ev.as_chars();
+    return Keymap::PushQuery;
+  }
+  else if (ev == Key::Ctrl) {
+    if (ev.get_mod() == 'r') {
+      return Keymap::RotateFilter;
+    }
+  }
+  return Keymap::Unknown;
+}
+
+auto Coco::handle_key_event(Window& term) -> Status
+{
+  std::string ch;
+  auto keymap = apply_keymap(term.poll_event(), ch);
+
+  switch (keymap) {
+  case Keymap::FinishSelectition:
+    return Status::Selected;
+
+  case Keymap::CancelSelection:
+    return Status::Escaped;
+
+  case Keymap::CursorDecrement: {
     if (cursor == 0) {
       offset = std::max(0, (int)offset - 1);
     }
@@ -175,7 +221,7 @@ auto Coco::handle_key_event(Window& term) -> Status
     }
     return Status::Continue;
   }
-  else if (ev == Key::Down) {
+  case Keymap::CursorIncrement: {
     int height;
     std::tie(std::ignore, height) = term.get_size();
 
@@ -187,30 +233,29 @@ auto Coco::handle_key_event(Window& term) -> Status
     }
     return Status::Continue;
   }
-  else if (ev == Key::Tab) {
+  case Keymap::ToggleSelection: {
     choices.toggle_selection(cursor + offset);
     return Status::Continue;
   }
-  else if (ev == Key::Backspace) {
+  case Keymap::PopQuery: {
     if (!query.empty()) {
       pop_back_utf8(query);
       update_filter_list();
     }
     return Status::Continue;
   }
-  else if (ev == Key::Ctrl) {
-    if (ev.get_mod() == 'r') {
-      filter_mode = static_cast<FilterMode>((static_cast<int>(filter_mode) + 1) % 3);
-      update_filter_list();
-    }
-    return Status::Continue;
-  }
-  else if (ev == Key::Char) {
-    query += ev.as_chars();
+  case Keymap::PushQuery: {
+    query += ch;
     update_filter_list();
     return Status::Continue;
   }
-  else {
+
+  case Keymap::RotateFilter: {
+    filter_mode = static_cast<FilterMode>((static_cast<int>(filter_mode) + 1) % 3);
+    update_filter_list();
+    return Status::Continue;
+  }
+  default:
     return Status::Continue;
   }
 }

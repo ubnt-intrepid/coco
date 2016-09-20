@@ -52,6 +52,7 @@ public:
 // represents a instance of Coco client.
 class Coco {
   enum class Status;
+  enum class Keymap;
 
   Config config;
   Choices choices;
@@ -69,6 +70,7 @@ private:
   void render_screen(curses::Window& term);
   Status handle_key_event(curses::Window& term);
   void update_filter_list();
+  Keymap apply_keymap(curses::Event ev, std::string& ch);
 };
 
 #endif

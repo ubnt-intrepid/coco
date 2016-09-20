@@ -50,7 +50,7 @@ void Config::parse_args(int argc, char const** argv)
   parser.add<std::string>("query", 'q', "initial value for query", false, "");
   parser.add<std::string>("prompt", 'p', "specify the prompt string", false, "QUERY> ");
   parser.add<std::size_t>("max-buffer", 'b', "maximum length of lines", false, 4096);
-  parser.add<double>("score-min", 's', "threshold of score", false, 0.01);
+//  parser.add<double>("score-min", 's', "threshold of score", false, 0.01);
   parser.add<std::string>("filter", 'f', "type of filter", false, "SmartCase",
                           cmdline::oneof<std::string>("CaseSensitive", "SmartCase", "Regex"));
   parser.footer("filename...");
@@ -58,7 +58,7 @@ void Config::parse_args(int argc, char const** argv)
 
   query = parser.get<std::string>("query");
   prompt = parser.get<std::string>("prompt");
-  score_min = parser.get<double>("score-min");
+// score_min = parser.get<double>("score-min");
   max_buffer = parser.get<std::size_t>("max-buffer");
 
   std::stringstream ss{parser.get<std::string>("filter")};

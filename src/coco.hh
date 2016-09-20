@@ -34,7 +34,7 @@ class Choices {
 
   std::vector<Choice> choices;
   std::size_t filtered_len = 0;
-  double score_min;
+  double score_min = 0.01;
 
 public:
   Choices() = default;

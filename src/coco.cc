@@ -54,19 +54,19 @@ void Config::parse_args(int argc, char const** argv)
   }
 }
 
-
-Choices::Choices(arc<std::vector<std::string>> candidates, double score_min) : candidates(candidates), score_min(score_min)
+Choices::Choices(arc<std::vector<std::string>> lines, receiver<bool> rx, double score_min)
+    : lines(lines), rx(std::move(rx)), score_min(score_min)
 {
-  choices.resize(candidates.read().get().size());
+  choices.resize(lines.read().get().size());
   std::generate(choices.begin(), choices.end(), [n = 0]() mutable { return Choice(n++); });
   filtered_len = choices.size();
 }
 
-void Choices::update(FilterMode mode, std::string const& query)
+void Choices::apply_filter(FilterMode mode, std::string const& query)
 {
   try {
     auto scorer = score_by(mode, query);
-    scorer->scoring(choices, candidates.read().get());
+    scorer->scoring(choices, lines.read().get());
     filtered_len =
         std::find_if(choices.begin(), choices.end(), [=](auto& choice) { return choice.score <= score_min; }) -
         choices.begin();
@@ -80,29 +80,27 @@ void Choices::update(FilterMode mode, std::string const& query)
   }
 }
 
-
-Coco::Coco(Config const& config, Candidates candidates) : config(config), candidates(candidates)
+Coco::Coco(Config const& config, Choices choices) : config(config), choices(std::move(choices))
 {
   query = config.query;
   filter_mode = config.filter_mode;
 
-  choices = Choices(candidates.lines, config.score_min);
   update_filter_list();
 }
 
 std::vector<std::string> Choices::get_selection(std::size_t idx)
 {
-  std::vector<std::string> lines;
+  std::vector<std::string> candidates;
   for (std::size_t i = 0; i < filtered_len; ++i) {
     if (choices[i].selected)
-      lines.push_back(candidates.read().get()[choices[i].index]);
+      candidates.push_back(lines.read().get()[choices[i].index]);
   }
 
-  if (lines.empty()) {
-    return {candidates.read().get()[choices[idx].index]};
+  if (candidates.empty()) {
+    return {lines.read().get()[choices[idx].index]};
   }
   else {
-    return lines;
+    return candidates;
   }
 }
 
@@ -219,7 +217,7 @@ auto Coco::handle_key_event(Window& term) -> Status
 
 void Coco::update_filter_list()
 {
-  choices.update(filter_mode, query);
+  choices.apply_filter(filter_mode, query);
 
   // reset cursor
   cursor = 0;

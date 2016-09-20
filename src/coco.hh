@@ -28,28 +28,25 @@ public:
   void parse_args(int argc, char const** argv);
 };
 
-struct Candidates {
-  arc<std::vector<std::string>> lines;
-  std::size_t max_buffer;
-};
-
 class Choices {
-  arc<std::vector<std::string>> candidates;
+  arc<std::vector<std::string>> lines;
+  receiver<bool> rx;
+
   std::vector<Choice> choices;
   std::size_t filtered_len = 0;
   double score_min;
 
 public:
   Choices() = default;
-  Choices(arc<std::vector<std::string>> candidates, double score_min);
+  Choices(Choices&&) noexcept = default;
+  Choices(arc<std::vector<std::string>> lines, receiver<bool> rx, double score_min);
 
   std::vector<std::string> get_selection(std::size_t index);
-  void update(FilterMode mode, std::string const& query);
-
+  void apply_filter(FilterMode mode, std::string const& query);
   bool is_selected(size_t index) { return choices[index].selected; }
   void toggle_selection(std::size_t index) { choices[index].selected ^= true; }
   std::size_t size() const noexcept { return filtered_len; }
-  std::string line(std::size_t index) { return candidates.read().get()[choices[index].index]; }
+  std::string line(std::size_t index) { return lines.read().get()[choices[index].index]; }
 };
 
 // represents a instance of Coco client.
@@ -57,18 +54,15 @@ class Coco {
   enum class Status;
 
   Config config;
-  Candidates candidates;
-  std::string query;
-
   Choices choices;
 
+  std::string query;
+  FilterMode filter_mode;
   std::size_t cursor = 0;
   std::size_t offset = 0;
 
-  FilterMode filter_mode;
-
 public:
-  Coco(Config const& config, Candidates candidates);
+  Coco(Config const& config, Choices choices);
   std::vector<std::string> select_line();
 
 private:

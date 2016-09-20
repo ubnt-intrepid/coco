@@ -14,7 +14,7 @@ void read_lines(std::vector<std::string>& lines, std::istream& is, std::size_t m
   }
 }
 
-Candidates get_candidates(std::string const& file, std::size_t max_buffer)
+arc<std::vector<std::string>> get_candidates(std::string const& file, std::size_t max_buffer)
 {
   std::vector<std::string> lines;
   lines.reserve(max_buffer);
@@ -26,7 +26,7 @@ Candidates get_candidates(std::string const& file, std::size_t max_buffer)
   else {
     read_lines(lines, std::cin, max_buffer);
   }
-  return Candidates{{std::move(lines)}, max_buffer};
+  return lines;
 }
 
 int main(int argc, char const* argv[])
@@ -38,9 +38,10 @@ int main(int argc, char const* argv[])
     Config config;
     config.parse_args(argc, argv);
 
-    Candidates candidates = get_candidates(config.file, config.max_buffer);
+    auto lines = get_candidates(config.file, config.max_buffer);
+    Choices choices(lines, receiver<bool>{}, config.score_min);
 
-    Coco coco{config, candidates};
+    Coco coco{config, std::move(choices)};
 
     // retrieve a selection from lines.
     auto selected_lines = coco.select_line();

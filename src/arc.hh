@@ -31,14 +31,14 @@ class locked_shared {
   std::reference_wrapper<T> body;
   std::shared_lock<Mutex> lock;
 
-  public:
+public:
   locked_shared() = delete;
   locked_shared(locked_shared const&) = delete;
   locked_shared& operator=(locked_shared const&) = delete;
   locked_shared(locked_shared&&) noexcept = default;
   locked_shared& operator=(locked_shared&&) noexcept = default;
 
-  locked_shared(T& body, Mutex& mtx): body{body}, lock{mtx}{}
+  locked_shared(T& body, Mutex& mtx) : body{body}, lock{mtx} {}
 
   T& operator*() const noexcept { return get(); }
 

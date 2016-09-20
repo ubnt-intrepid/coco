@@ -24,7 +24,7 @@ struct Config {
   std::string query;
   double score_min;
   std::size_t max_buffer;
-  std::string filter;
+  FilterMode filter_mode;
 
 public:
   Config() = default;

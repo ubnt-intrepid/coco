@@ -56,7 +56,9 @@ Candidates Config::parse_args(int argc, char const** argv)
   prompt = parser.get<std::string>("prompt");
   score_min = parser.get<double>("score-min");
   max_buffer = parser.get<std::size_t>("max-buffer");
-  filter = parser.get<std::string>("filter");
+
+  std::stringstream ss{parser.get<std::string>("filter")};
+  ss >> filter_mode;
 
   std::vector<std::string> lines;
   lines.reserve(max_buffer);
@@ -75,9 +77,7 @@ Candidates Config::parse_args(int argc, char const** argv)
 Coco::Coco(Config const& config, Candidates candidates) : config(config), candidates(candidates)
 {
   query = config.query;
-
-  std::stringstream ss{config.filter};
-  ss >> filter_mode;
+  filter_mode = config.filter_mode;
 
   choices.resize(candidates.lines.read().get().size());
   std::generate(choices.begin(), choices.end(), [n = 0]() mutable { return Choice(n++); });

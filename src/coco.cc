@@ -23,7 +23,8 @@ using curses::Key;
 enum class Coco::Status {
   Selected,
   Escaped,
-  Continue,
+  Updated,
+  Skip,
 };
 
 enum class Coco::Keymap {
@@ -132,8 +133,9 @@ std::vector<std::string> Coco::select_line()
     else if (result == Status::Escaped) {
       break;
     }
-
-    render_screen(term);
+    else if (result == Status::Updated) {
+      render_screen(term);
+    }
   }
 
   return {};
@@ -220,7 +222,7 @@ auto Coco::handle_key_event(Window& term) -> Status
     else {
       cursor--;
     }
-    return Status::Continue;
+    return Status::Updated;
   }
   case Keymap::CursorIncrement: {
     int height;
@@ -232,32 +234,32 @@ auto Coco::handle_key_event(Window& term) -> Status
     else {
       cursor = std::min<size_t>(cursor + 1, std::min<size_t>(choices.size() - offset, height - y_offset) - 1);
     }
-    return Status::Continue;
+    return Status::Updated;
   }
   case Keymap::ToggleSelection: {
     choices.toggle_selection(cursor + offset);
-    return Status::Continue;
+    return Status::Updated;
   }
   case Keymap::PopQuery: {
     if (!query.empty()) {
       pop_back_utf8(query);
       update_filter_list();
     }
-    return Status::Continue;
+    return Status::Updated;
   }
   case Keymap::PushQuery: {
     query += ch;
     update_filter_list();
-    return Status::Continue;
+    return Status::Updated;
   }
 
   case Keymap::RotateFilter: {
     filter_mode = static_cast<FilterMode>((static_cast<int>(filter_mode) + 1) % 3);
     update_filter_list();
-    return Status::Continue;
+    return Status::Updated;
   }
   default:
-    return Status::Continue;
+    return Status::Skip;
   }
 }
 

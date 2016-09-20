@@ -36,10 +36,10 @@ Window::Window()
   win = stdscr;
 
   // setup
-  ::noecho();          // do not echo back characters
-  ::cbreak();          // without buffering
-  ::keypad(win, true); // convert escape sequeces to key code
-  ::ESCDELAY = 25;     // set delay time
+  ::noecho();           // do not echo back characters
+  ::cbreak();           // without buffering
+  ::keypad(win, true);  // convert escape sequeces to key code
+  ::nodelay(win, true); // set delay time
 
   // initialize colormap.
   // start_color();
@@ -77,14 +77,11 @@ Event Window::poll_event()
     return Event{Key::Enter};
   }
   else if (ch == 27) {
-    ::nodelay(win, true);
     int ch = ::wgetch(win);
     if (ch == -1) {
-      ::nodelay(win, false);
       return Event{Key::Esc};
     }
     else {
-      ::nodelay(win, false);
       return Event{Key::Alt, ch};
     }
   }
@@ -120,3 +117,4 @@ Event Window::poll_event()
 }
 
 } // namespace curses;
+

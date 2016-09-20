@@ -8,3 +8,4 @@ build/
 
 .waf_unittest_gmock/
 __pycache__/
+Makefile

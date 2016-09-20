@@ -39,7 +39,7 @@ Window::Window()
   ::noecho();           // do not echo back characters
   ::cbreak();           // without buffering
   ::keypad(win, true);  // convert escape sequeces to key code
-  ::nodelay(win, true); // set delay time
+  ::wtimeout(win, 1);   // set delay time
 
   // initialize colormap.
   // start_color();

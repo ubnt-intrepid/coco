@@ -80,7 +80,7 @@ std::vector<std::string> Coco::select_line()
           lines.push_back(candidates.lines.read().get()[choices[i].index]);
       }
       if (lines.empty()) {
-        return {candidates.lines.read().get()[cursor + offset]};
+        return {candidates.lines.read().get()[choices[cursor + offset].index]};
       }
       else {
         return lines;

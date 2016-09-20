@@ -69,7 +69,7 @@ Candidates Config::parse_args(int argc, char const** argv)
   else {
     read_lines(lines, std::cin, max_buffer);
   }
-  return Candidates{std::move(lines)};
+  return Candidates{{std::move(lines)}};
 }
 
 Coco::Coco(Config const& config, Candidates candidates) : config(config), candidates(candidates)
@@ -79,7 +79,7 @@ Coco::Coco(Config const& config, Candidates candidates) : config(config), candid
   std::stringstream ss{config.filter};
   ss >> filter_mode;
 
-  choices.resize(candidates.lines.size());
+  choices.resize(candidates.lines.read().get().size());
   std::generate(choices.begin(), choices.end(), [n = 0]() mutable { return Choice(n++); });
   update_filter_list();
 }
@@ -97,10 +97,10 @@ std::vector<std::string> Coco::select_line()
       std::vector<std::string> lines;
       for (std::size_t i = 0; i < filtered_len; ++i) {
         if (choices[i].selected)
-          lines.push_back(candidates.lines[choices[i].index]);
+          lines.push_back(candidates.lines.read().get()[choices[i].index]);
       }
       if (lines.empty()) {
-        return {candidates.lines[cursor + offset]};
+        return {candidates.lines.read().get()[cursor + offset]};
       }
       else {
         return lines;
@@ -127,7 +127,7 @@ void Coco::render_screen(Window& term)
     if (choices[y + offset].selected) {
       term.add_str(0, y + y_offset, ">");
     }
-    term.add_str(2, y + 1, candidates.lines[choices[y + offset].index]);
+    term.add_str(2, y + 1, candidates.lines.read().get()[choices[y + offset].index]);
 
     if (y == cursor) {
       term.change_attr(0, y + 1, -1, 0);
@@ -209,7 +209,7 @@ void Coco::update_filter_list()
 {
   try {
     auto scorer = score_by(filter_mode, query);
-    scorer->scoring(choices, candidates.lines);
+    scorer->scoring(choices, candidates.lines.read().get());
     filtered_len = std::find_if(choices.begin(), choices.end(),
                                 [this](auto& choice) { return choice.score <= config.score_min; }) -
                    choices.begin();

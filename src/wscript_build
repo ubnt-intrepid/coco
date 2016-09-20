@@ -13,4 +13,4 @@ bld.program(features='cxx cxxprogram',
             target='coco',
             source='coco_main.cc coco.cc ncurses.cc utf8.cc filter.cc',
             includes = ['.', '../external', '../external/boostpp/include'],
-            use = 'NCURSESW')
+            use = 'NCURSESW PTHREAD')

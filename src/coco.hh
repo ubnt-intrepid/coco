@@ -7,6 +7,8 @@
 #include <vector>
 #include "filter.hh"
 #include "choice.hh"
+#include "arc.hh"
+#include "channel.hh"
 
 namespace curses {
 class Window;
@@ -14,7 +16,7 @@ class Event;
 }
 
 struct Candidates {
-  std::vector<std::string> lines;
+  arc<std::vector<std::string>> lines;
 };
 
 struct Config {

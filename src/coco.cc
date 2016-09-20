@@ -46,8 +46,9 @@ void Config::parse_args(int argc, char const** argv)
 {
   cmdline::parser parser;
   parser.set_program_name("coco");
-  parser.add<std::string>("query", 0, "initial value for query", false, "");
-  parser.add<std::string>("prompt", 0, "specify the prompt string", false, "QUERY> ");
+  parser.add("help", 'h', "print this message");
+  parser.add<std::string>("query", 'q', "initial value for query", false, "");
+  parser.add<std::string>("prompt", 'p', "specify the prompt string", false, "QUERY> ");
   parser.add<std::size_t>("max-buffer", 'b', "maximum length of lines", false, 4096);
   parser.add<double>("score-min", 's', "threshold of score", false, 0.01);
   parser.add<std::string>("filter", 'f', "type of filter", false, "SmartCase",

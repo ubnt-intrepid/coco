@@ -92,14 +92,6 @@ void Choices::apply_filter(FilterMode mode, std::string const& query)
   }
 }
 
-Coco::Coco(Config const& config, Choices choices) : config(config), choices(std::move(choices))
-{
-  query = config.query;
-  filter_mode = config.filter_mode;
-
-  update_filter_list();
-}
-
 std::vector<std::string> Choices::get_selection(std::size_t idx)
 {
   std::vector<std::string> candidates;
@@ -108,12 +100,21 @@ std::vector<std::string> Choices::get_selection(std::size_t idx)
       candidates.push_back(lines.read().get()[choices[i].index]);
   }
 
-  if (candidates.empty()) {
+  if (candidates.empty() && filtered_len > 0) {
     return {lines.read().get()[choices[idx].index]};
   }
   else {
     return candidates;
   }
+}
+
+
+Coco::Coco(Config const& config, Choices choices) : config(config), choices(std::move(choices))
+{
+  query = config.query;
+  filter_mode = config.filter_mode;
+
+  update_filter_list();
 }
 
 std::vector<std::string> Coco::select_line()

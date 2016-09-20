@@ -33,6 +33,25 @@ struct Candidates {
   std::size_t max_buffer;
 };
 
+class Choices {
+  arc<std::vector<std::string>> candidates;
+  std::vector<Choice> choices;
+  std::size_t filtered_len = 0;
+  double score_min;
+
+public:
+  Choices() = default;
+  Choices(arc<std::vector<std::string>> candidates, double score_min);
+
+  std::vector<std::string> get_selection(std::size_t index);
+  void update(FilterMode mode, std::string const& query);
+
+  bool is_selected(size_t index) { return choices[index].selected; }
+  void toggle_selection(std::size_t index) { choices[index].selected ^= true; }
+  std::size_t size() const noexcept { return filtered_len; }
+  std::string line(std::size_t index) { return candidates.read().get()[choices[index].index]; }
+};
+
 // represents a instance of Coco client.
 class Coco {
   enum class Status;
@@ -41,8 +60,7 @@ class Coco {
   Candidates candidates;
   std::string query;
 
-  std::vector<Choice> choices;
-  std::size_t filtered_len = 0;
+  Choices choices;
 
   std::size_t cursor = 0;
   std::size_t offset = 0;

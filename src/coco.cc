@@ -54,14 +54,56 @@ void Config::parse_args(int argc, char const** argv)
   }
 }
 
+
+Choices::Choices(arc<std::vector<std::string>> candidates, double score_min) : candidates(candidates), score_min(score_min)
+{
+  choices.resize(candidates.read().get().size());
+  std::generate(choices.begin(), choices.end(), [n = 0]() mutable { return Choice(n++); });
+  filtered_len = choices.size();
+}
+
+void Choices::update(FilterMode mode, std::string const& query)
+{
+  try {
+    auto scorer = score_by(mode, query);
+    scorer->scoring(choices, candidates.read().get());
+    filtered_len =
+        std::find_if(choices.begin(), choices.end(), [=](auto& choice) { return choice.score <= score_min; }) -
+        choices.begin();
+  }
+  catch (std::regex_error&) {
+  }
+
+  // mark hidden choices unselected.
+  for (size_t i = filtered_len; i < choices.size(); ++i) {
+    choices[i].selected = false;
+  }
+}
+
+
 Coco::Coco(Config const& config, Candidates candidates) : config(config), candidates(candidates)
 {
   query = config.query;
   filter_mode = config.filter_mode;
 
-  choices.resize(candidates.lines.read().get().size());
-  std::generate(choices.begin(), choices.end(), [n = 0]() mutable { return Choice(n++); });
+  choices = Choices(candidates.lines, config.score_min);
   update_filter_list();
+}
+
+std::vector<std::string> Choices::get_selection(std::size_t idx)
+{
+  std::vector<std::string> lines;
+  for (std::size_t i = 0; i < filtered_len; ++i) {
+    if (choices[i].selected)
+      lines.push_back(candidates.read().get()[choices[i].index]);
+  }
+
+  if (lines.empty()) {
+    return {candidates.read().get()[choices[idx].index]};
+  }
+  else {
+    return lines;
+  }
 }
 
 std::vector<std::string> Coco::select_line()
@@ -74,17 +116,7 @@ std::vector<std::string> Coco::select_line()
     auto result = handle_key_event(term);
 
     if (result == Status::Selected) {
-      std::vector<std::string> lines;
-      for (std::size_t i = 0; i < filtered_len; ++i) {
-        if (choices[i].selected)
-          lines.push_back(candidates.lines.read().get()[choices[i].index]);
-      }
-      if (lines.empty()) {
-        return {candidates.lines.read().get()[choices[cursor + offset].index]};
-      }
-      else {
-        return lines;
-      }
+      return choices.get_selection(cursor + offset);
     }
     else if (result == Status::Escaped) {
       break;
@@ -103,11 +135,11 @@ void Coco::render_screen(Window& term)
   int width, height;
   std::tie(width, height) = term.get_size();
 
-  for (size_t y = 0; y < std::min<size_t>(filtered_len - offset, height - 1); ++y) {
-    if (choices[y + offset].selected) {
+  for (size_t y = 0; y < std::min<size_t>(choices.size() - offset, height - 1); ++y) {
+    if (choices.is_selected(y + offset)) {
       term.add_str(0, y + y_offset, ">");
     }
-    term.add_str(2, y + 1, candidates.lines.read().get()[choices[y + offset].index]);
+    term.add_str(2, y + 1, choices.line(y + offset));
 
     if (y == cursor) {
       term.change_attr(0, y + 1, -1, 0);
@@ -117,7 +149,7 @@ void Coco::render_screen(Window& term)
   std::string query_str = config.prompt + query;
 
   std::stringstream ss;
-  ss << filter_mode << " [" << cursor + offset << "/" << filtered_len << "]";
+  ss << filter_mode << " [" << cursor + offset << "/" << choices.size() << "]";
   std::string mode_str = ss.str();
 
   term.add_str(width - 1 - mode_str.length(), 0, mode_str);
@@ -150,15 +182,15 @@ auto Coco::handle_key_event(Window& term) -> Status
     std::tie(std::ignore, height) = term.get_size();
 
     if (cursor == static_cast<size_t>(height - 1 - y_offset)) {
-      offset = std::min<size_t>(offset + 1, std::max<int>(0, filtered_len - height + y_offset));
+      offset = std::min<size_t>(offset + 1, std::max<int>(0, choices.size() - height + y_offset));
     }
     else {
-      cursor = std::min<size_t>(cursor + 1, std::min<size_t>(filtered_len - offset, height - y_offset) - 1);
+      cursor = std::min<size_t>(cursor + 1, std::min<size_t>(choices.size() - offset, height - y_offset) - 1);
     }
     return Status::Continue;
   }
   else if (ev == Key::Tab) {
-    choices[cursor + offset].selected ^= true;
+    choices.toggle_selection(cursor + offset);
     return Status::Continue;
   }
   else if (ev == Key::Backspace) {
@@ -187,20 +219,7 @@ auto Coco::handle_key_event(Window& term) -> Status
 
 void Coco::update_filter_list()
 {
-  try {
-    auto scorer = score_by(filter_mode, query);
-    scorer->scoring(choices, candidates.lines.read().get());
-    filtered_len = std::find_if(choices.begin(), choices.end(),
-                                [this](auto& choice) { return choice.score <= config.score_min; }) -
-                   choices.begin();
-  }
-  catch (std::regex_error&) {
-  }
-
-  // mark hidden choices unselected.
-  for (size_t i = filtered_len; i < choices.size(); ++i) {
-    choices[i].selected = false;
-  }
+  choices.update(filter_mode, query);
 
   // reset cursor
   cursor = 0;

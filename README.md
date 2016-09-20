@@ -1,9 +1,8 @@
 # coco
 
-![captured](cap.gif "captured")
-
 `coco` is an alternative of interactive text selector written in C++.
-This project is inspired from D language version of text selector [doco](https://github.com/alphaKAI/doco).
+
+This project is inspired from [doco](https://github.com/alphaKAI/doco), a fuzzy text selector written in D language.
 
 ## Features 
 * available on `mintty`, Cygwin/MSYS2's default terminal emulator
@@ -25,6 +24,10 @@ $ git clone https://github.com/ys-nuem/coco.git
 $ cd coco/
 $ ./waf --prefix=/usr/local configure install
 ```
+
+## Example
+
+<img src="cap.gif" alt="captured" width="600">
 
 ## License
 Copyright (c) 2016, Yusuke Sasaki

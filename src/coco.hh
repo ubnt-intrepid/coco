@@ -15,20 +15,22 @@ class Window;
 class Event;
 }
 
-struct Candidates {
-  arc<std::vector<std::string>> lines;
-};
-
 struct Config {
   std::string prompt;
   std::string query;
   double score_min;
   std::size_t max_buffer;
   FilterMode filter_mode;
+  std::string file;
 
 public:
   Config() = default;
-  Candidates parse_args(int argc, char const** argv);
+  void parse_args(int argc, char const** argv);
+};
+
+struct Candidates {
+  arc<std::vector<std::string>> lines;
+  std::size_t max_buffer;
 };
 
 // represents a instance of Coco client.

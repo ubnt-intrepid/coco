@@ -1,11 +1,10 @@
 #include "coco.hh"
 
 #include <algorithm>
-#include <fstream>
 #include <functional>
 #include <iostream>
-#include <numeric>
 #include <regex>
+#include <numeric>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -29,17 +28,7 @@ enum class Coco::Status {
 
 constexpr size_t y_offset = 1;
 
-void read_lines(std::vector<std::string>& lines, std::istream& is, std::size_t max_len)
-{
-  static std::regex ansi(R"(\x1B\[([0-9]{1,2}(;[0-9]{1,2})?)?[m|K])");
-  for (std::string line; std::getline(is, line);) {
-    if (lines.size() == max_len)
-      return;
-    lines.push_back(std::regex_replace(line, ansi, ""));
-  }
-}
-
-Candidates Config::parse_args(int argc, char const** argv)
+void Config::parse_args(int argc, char const** argv)
 {
   cmdline::parser parser;
   parser.set_program_name("coco");
@@ -60,18 +49,9 @@ Candidates Config::parse_args(int argc, char const** argv)
   std::stringstream ss{parser.get<std::string>("filter")};
   ss >> filter_mode;
 
-  std::vector<std::string> lines;
-  lines.reserve(max_buffer);
   if (parser.rest().size() > 0) {
-    for (auto&& path : parser.rest()) {
-      std::ifstream ifs{path};
-      read_lines(lines, ifs, max_buffer);
-    }
+    file = parser.rest()[0];
   }
-  else {
-    read_lines(lines, std::cin, max_buffer);
-  }
-  return Candidates{{std::move(lines)}};
 }
 
 Coco::Coco(Config const& config, Candidates candidates) : config(config), candidates(candidates)

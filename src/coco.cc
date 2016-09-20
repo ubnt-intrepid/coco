@@ -3,12 +3,13 @@
 #include <algorithm>
 #include <functional>
 #include <iostream>
-#include <regex>
 #include <numeric>
+#include <regex>
 #include <stdexcept>
 #include <string>
-#include <vector>
+#include <thread>
 #include <tuple>
+#include <vector>
 
 #include <nanojson.hpp>
 #include <cmdline.h>
@@ -109,7 +110,6 @@ std::vector<std::string> Choices::get_selection(std::size_t idx)
   }
 }
 
-
 Coco::Coco(Config const& config, Choices choices) : config(config), choices(std::move(choices))
 {
   query = config.query;
@@ -124,6 +124,7 @@ std::vector<std::string> Coco::select_line()
   Window term;
   render_screen(term);
 
+  // event loop.
   while (true) {
     auto result = handle_key_event(term);
 
@@ -136,6 +137,8 @@ std::vector<std::string> Coco::select_line()
     else if (result == Status::Updated) {
       render_screen(term);
     }
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(1));
   }
 
   return {};
@@ -183,7 +186,7 @@ auto Coco::apply_keymap(Event ev, std::string& ch) -> Keymap
     return Keymap::CursorDecrement;
   }
   else if (ev == Key::Down) {
-    return Keymap::CursorDecrement;
+    return Keymap::CursorIncrement;
   }
   else if (ev == Key::Tab) {
     return Keymap::ToggleSelection;

@@ -39,7 +39,7 @@ Window::Window()
   ::noecho();           // do not echo back characters
   ::cbreak();           // without buffering
   ::keypad(win, true);  // convert escape sequeces to key code
-  ::wtimeout(win, 1);   // set delay time
+  ::nodelay(win, true); // non-blocking input
 
   // initialize colormap.
   // start_color();
@@ -117,4 +117,3 @@ Event Window::poll_event()
 }
 
 } // namespace curses;
-

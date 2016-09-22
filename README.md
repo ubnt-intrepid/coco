@@ -1,8 +1,8 @@
 # coco
 
-`coco` is an alternative of interactive text selector written in C++.
+`coco` is an alternative of interactive text selector, written in C++.
 
-This project is inspired from [doco](https://github.com/alphaKAI/doco), a fuzzy text selector written in D language.
+This project is inspired by [doco](https://github.com/alphaKAI/doco), a fuzzy text selector written in D language.
 
 ## Features 
 * available on `mintty`, Cygwin/MSYS2's default terminal emulator

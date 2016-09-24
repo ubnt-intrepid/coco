@@ -40,6 +40,7 @@ Window::Window()
   ::cbreak();           // without buffering
   ::keypad(win, true);  // convert escape sequeces to key code
   ::nodelay(win, true); // non-blocking input
+  ::ESCDELAY = 0;
 
   // initialize colormap.
   // start_color();
@@ -78,7 +79,7 @@ Event Window::poll_event()
   }
   else if (ch == 27) {
     int ch = ::wgetch(win);
-    if (ch == -1) {
+    if (ch == ERR) {
       return Event{Key::Esc};
     }
     else {

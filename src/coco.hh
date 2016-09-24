@@ -22,6 +22,7 @@ struct Config {
   std::size_t max_buffer;
   FilterMode filter_mode;
   std::string file;
+  bool select_one;
 
 public:
   Config() = default;

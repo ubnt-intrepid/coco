@@ -50,16 +50,18 @@ void Config::parse_args(int argc, char const** argv)
   parser.add<std::string>("query", 'q', "initial value for query", false, "");
   parser.add<std::string>("prompt", 'p', "specify the prompt string", false, "QUERY> ");
   parser.add<std::size_t>("max-buffer", 'b', "maximum length of lines", false, 4096);
-//  parser.add<double>("score-min", 's', "threshold of score", false, 0.01);
+  //  parser.add<double>("score-min", 's', "threshold of score", false, 0.01);
   parser.add<std::string>("filter", 'f', "type of filter", false, "SmartCase",
                           cmdline::oneof<std::string>("CaseSensitive", "SmartCase", "Regex"));
+  parser.add("select-one", 0, "Skip prompting if the number of candidates is one or zero");
   parser.footer("filename...");
   parser.parse_check(argc, argv);
 
   query = parser.get<std::string>("query");
   prompt = parser.get<std::string>("prompt");
-// score_min = parser.get<double>("score-min");
+  // score_min = parser.get<double>("score-min");
   max_buffer = parser.get<std::size_t>("max-buffer");
+  select_one = parser.exist("select-one");
 
   std::stringstream ss{parser.get<std::string>("filter")};
   ss >> filter_mode;
@@ -121,6 +123,10 @@ Coco::Coco(Config const& config, Choices choices) : config(config), choices(std:
 
 std::vector<std::string> Coco::select_line()
 {
+  if (config.select_one && choices.size() <= 1) {
+    return choices.get_selection(0);
+  }
+
   // initialize ncurses screen.
   Window term;
   render_screen(term);
